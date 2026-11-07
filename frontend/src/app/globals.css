@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-crimson: #b3112f;
+  --color-crimson-hover: #930d26;
+  --color-crimson-link-hover: #7e0c23;
+  --color-ink: #16181d;
+  --color-slate-ink: #1f2937;
+  --color-slate-muted: #5b6574;
+  --color-muted: #6b7280;
+  --color-field: #f2f3f5;
+  --color-page: #f6f3f4;
+  --color-error: #b42318;
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-jakarta), system-ui, sans-serif;
+}
+
+/* The whole UI is rem-based, so it scales with the screen height:
+   about 14px on a 768px-high laptop, 16px around 890px, up to 22px on very large screens. */
+html {
+  font-size: clamp(12px, 1.8vh, 22px);
+}
+
+body {
+  margin: 0;
+  background: #f6f3f4;
+  color: #16181d;
+  font-family: var(--font-jakarta), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.focus-ring:focus-visible {
+  outline: 3px solid rgba(179, 17, 47, 0.4);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
