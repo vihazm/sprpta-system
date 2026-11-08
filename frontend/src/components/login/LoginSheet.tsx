@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { signIn } from "@/lib/auth-client";
+import { notify } from "@/lib/notify";
+import { safeNextPath } from "@/lib/roles";
 import {
+  normaliseIdentifier,
   sanitizePhoneInput,
   validateIdentifier,
   validatePassword,
@@ -14,13 +19,14 @@ const inputClass =
   "h-[3.1rem] w-full rounded-[0.95rem] border-[1.5px] border-transparent bg-field px-[1.05rem] text-[0.96rem] font-medium text-ink outline-none transition placeholder:text-[#6F7682] focus:border-crimson focus:bg-white focus:shadow-[0_0_0_0.25rem_rgba(179,17,47,0.12)] aria-[invalid=true]:border-error aria-[invalid=true]:bg-[#FFF6F5]";
 
 export function LoginSheet() {
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
   const [mode, setMode] = useState<AuthMode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [identifierTouched, setIdentifierTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
-  const [notice, setNotice] = useState("");
 
   const isEmail = mode === "email";
   const identifierError = identifierTouched
@@ -33,19 +39,31 @@ export function LoginSheet() {
     setMode(next);
     setIdentifier("");
     setIdentifierTouched(false);
-    setNotice("");
   }
 
-  function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (submitting) return;
     setIdentifierTouched(true);
     setPasswordTouched(true);
-    if (validateIdentifier(mode, identifier) || validatePassword(password)) {
-      setNotice("");
+    if (validateIdentifier(mode, identifier) || validatePassword(password)) return;
+
+    setSubmitting(true);
+    const result = await signIn(normaliseIdentifier(mode, identifier), password);
+    if (result.ok) {
+      notify.success("Signed in", `Welcome back, ${result.name}.`);
+      // Stay in the "submitting" state while the next page loads.
+      const next = safeNextPath(
+        new URLSearchParams(window.location.search).get("next"),
+        result.role,
+      );
+      router.replace(next ?? result.redirectTo);
       return;
     }
-    // Front end only for now: no backend call yet.
-    setNotice("Sign-in is not connected to the server yet.");
+    notify.error(result.title, result.message);
+    setPassword("");
+    setPasswordTouched(false);
+    setSubmitting(false);
   }
 
   return (
@@ -134,7 +152,6 @@ export function LoginSheet() {
               setIdentifier(
                 isEmail ? e.target.value : sanitizePhoneInput(e.target.value),
               );
-              setNotice("");
             }}
             onBlur={() => setIdentifierTouched(true)}
             aria-invalid={!!identifierError}
@@ -165,7 +182,6 @@ export function LoginSheet() {
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
-                setNotice("");
               }}
               onBlur={() => setPasswordTouched(true)}
               aria-invalid={!!passwordError}
@@ -185,9 +201,10 @@ export function LoginSheet() {
 
         <button
           type="submit"
-          className="focus-ring group flex h-[3.3rem] cursor-pointer items-center justify-center gap-[0.55rem] rounded-2xl bg-crimson text-base font-bold text-white shadow-[0_14px_26px_-12px_rgba(179,17,47,0.85)] transition hover:bg-crimson-hover active:translate-y-px"
+          disabled={submitting}
+          className="focus-ring group flex h-[3.3rem] cursor-pointer items-center justify-center gap-[0.55rem] rounded-2xl bg-crimson text-base font-bold text-white shadow-[0_14px_26px_-12px_rgba(179,17,47,0.85)] transition hover:bg-crimson-hover active:translate-y-px disabled:cursor-wait disabled:opacity-70"
         >
-          Sign in
+          {submitting ? "Signing in…" : "Sign in"}
           <svg
             width="17"
             height="17"
@@ -203,14 +220,6 @@ export function LoginSheet() {
             <path d="M5 12h14M13 6l6 6-6 6" />
           </svg>
         </button>
-
-        <div role="status" aria-live="polite">
-          {notice && (
-            <p className="m-0 text-center text-[0.8rem] font-semibold text-muted">
-              {notice}
-            </p>
-          )}
-        </div>
       </form>
 
       <Link
