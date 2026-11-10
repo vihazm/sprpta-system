@@ -1,11 +1,18 @@
+import type { ReactNode } from "react";
 import { ROLE_LABEL } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
 /**
- * Placeholder body for every role's landing page, until the real screens are
- * built. Shows a welcome message so sign-in and redirects can be checked.
+ * The welcome card at the top of every role's landing page. Below it goes the
+ * page's content; until a role's screens are built, a placeholder shows instead.
  */
-export async function WelcomePanel({ screen }: { screen: string }) {
+export async function WelcomePanel({
+  screen,
+  children,
+}: {
+  screen: string;
+  children?: ReactNode;
+}) {
   const user = await getSession();
   if (!user) return null; // the shell has already redirected unauthenticated visitors
 
@@ -23,14 +30,16 @@ export async function WelcomePanel({ screen }: { screen: string }) {
           {user.areaName ? ` for ${user.areaName}` : ""}.
         </p>
       </section>
-      <section className="rounded-[1.6rem] border-[1.5px] border-dashed border-[#E2D6DA] px-[2rem] py-[2.4rem] text-center">
-        <p className="m-0 text-[0.95rem] font-semibold text-slate-ink">
-          This page is blank for now.
-        </p>
-        <p className="mb-0 mt-[0.3rem] text-[0.86rem] text-muted">
-          The screens for your role will appear here as they are built.
-        </p>
-      </section>
+      {children ?? (
+        <section className="rounded-[1.6rem] border-[1.5px] border-dashed border-[#E2D6DA] px-[2rem] py-[2.4rem] text-center">
+          <p className="m-0 text-[0.95rem] font-semibold text-slate-ink">
+            This page is blank for now.
+          </p>
+          <p className="mb-0 mt-[0.3rem] text-[0.86rem] text-muted">
+            The screens for your role will appear here as they are built.
+          </p>
+        </section>
+      )}
     </div>
   );
 }

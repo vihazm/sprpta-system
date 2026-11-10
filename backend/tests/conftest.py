@@ -96,8 +96,8 @@ def galle(db) -> Area:
 
 
 def make_user(db, login: str, role: UserRole, *, area_id=None, **extra) -> User:
+    extra.setdefault("full_name", f"Test {role.value}")
     user = User(
-        full_name=f"Test {role.value}",
         login=login,
         password_hash=hash_password(PASSWORD),
         role=role,
