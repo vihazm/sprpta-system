@@ -1,4 +1,4 @@
-import { bigNumber } from "../dashboard/ui";
+import { bigNumber } from "@/components/dashboard/ui";
 import { formatDuration, formatShortDay } from "./format";
 import type { Uptime } from "./types";
 

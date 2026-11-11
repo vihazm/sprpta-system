@@ -1,4 +1,4 @@
-import { Card, eyebrow } from "../dashboard/ui";
+import { Card, eyebrow } from "@/components/dashboard/ui";
 import { formatAgo } from "./format";
 import { RunChecksButton } from "./RunChecksButton";
 

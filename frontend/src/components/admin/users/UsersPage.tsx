@@ -1,4 +1,4 @@
-import { Card, muted } from "../dashboard/ui";
+import { Card, muted } from "@/components/dashboard/ui";
 import { UserDirectory } from "./UserDirectory";
 import { UsersStats } from "./UsersStats";
 import { getUsersSummary } from "./live-data";

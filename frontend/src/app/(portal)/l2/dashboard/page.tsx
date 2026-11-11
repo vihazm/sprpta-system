@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { WelcomePanel } from "@/components/portal/WelcomePanel";
+import { L2Dashboard } from "@/components/l2/dashboard/L2Dashboard";
 
 export const metadata: Metadata = { title: "Dashboard | SPRPTA" };
 
 export default function Page() {
-  return <WelcomePanel screen="Dashboard" />;
+  return <L2Dashboard />;
 }

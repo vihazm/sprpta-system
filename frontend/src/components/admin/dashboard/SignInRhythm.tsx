@@ -1,5 +1,5 @@
 import { AreaChart } from "./AreaChart";
-import { Card, CardHeading, PillButton } from "./ui";
+import { Card, CardHeading, PillButton } from "@/components/dashboard/ui";
 
 const hourLabel = (hour: number) => `${String(hour).padStart(2, "0")}:00`;
 

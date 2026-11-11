@@ -1,5 +1,5 @@
 import type { UsageEvent } from "./types";
-import { Card, CardHeading, PillButton, muted } from "./ui";
+import { Card, CardHeading, PillButton, muted } from "@/components/dashboard/ui";
 
 const DOT_STYLES: Record<UsageEvent["event"], string> = {
   "signed in": "border-crimson bg-white",

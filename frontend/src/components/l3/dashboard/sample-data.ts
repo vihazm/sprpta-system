@@ -1,0 +1,166 @@
+import type { L3DashboardData } from "./types";
+
+// Sample figures so the dashboard can be reviewed before the complaints module exists.
+// Replace this with a fetch when the API does.
+export const l3DashboardSample: L3DashboardData = {
+  month: { received: 312, closed: 241, open: 59, rejected: 12, overdue: 14 },
+  escalatedTotal: 6,
+  escalated: [
+    {
+      ref: "C-2026-00403",
+      severity: "critical",
+      title: "Assault allegation at Hambantota stand",
+      escalatedAgo: "2 h ago",
+      reason: "Serious allegation, needs a senior decision.",
+      officer: "Hambantota · Anusha P.",
+    },
+    {
+      ref: "C-2026-00359",
+      severity: "high",
+      title: "Repeated overloading, same operator",
+      escalatedAgo: "1 d ago",
+      reason: "Operator has 5 substantiated complaints.",
+      officer: "Matara · Sunil D.",
+    },
+    {
+      ref: "C-2026-00341",
+      severity: "high",
+      title: "Permit holder disputes the finding",
+      escalatedAgo: "2 d ago",
+      reason: "Conflicting evidence from both sides.",
+      officer: "Galle · Chaminda R.",
+    },
+    {
+      ref: "C-2026-00330",
+      severity: "medium",
+      title: "Legal action recommended against an operator",
+      escalatedAgo: "3 d ago",
+      reason: "Beyond the area officer's powers.",
+      officer: "Galle · Chaminda R.",
+    },
+  ],
+  ai: {
+    question: "Which area had the most unresolved cases this quarter?",
+    answer:
+      "Matara (21 open) and Hambantota (19 open) lead. In Matara, 11 of the 21 are waiting for implementing staff to mark them done. In Hambantota, most are still under review because the area has no active Level 2 officer.",
+    basedOn: ["Case records Q3", "Time targets"],
+    suggestions: ["Why do trishaw complaints close slower?", "Which operators repeat?"],
+  },
+  volume: [
+    { label: "Jun", received: 248, closed: 190 },
+    { label: "Jul", received: 262, closed: 205 },
+    { label: "Aug", received: 281, closed: 224 },
+    { label: "Sep", received: 289, closed: 228 },
+    { label: "Oct", received: 301, closed: 236 },
+    { label: "Nov", received: 312, closed: 241 },
+  ],
+  statuses: [
+    { label: "Closed", value: 241, color: "#1f9d63" },
+    { label: "Under review", value: 24, color: "#2e7bc4" },
+    { label: "Awaiting implementation", value: 21, color: "#b3112f" },
+    { label: "Done, awaiting approval", value: 8, color: "#d9a30b" },
+    { label: "Escalated", value: 6, color: "#6b7280" },
+    { label: "Rejected", value: 12, color: "#c9a3ad" },
+  ],
+  overdueAtLevel2: 9,
+  transport: [
+    { label: "Bus", cases: 176, closedPercent: 82, averageDays: 3.8, color: "#b3112f" },
+    { label: "Trishaw", cases: 136, closedPercent: 71, averageDays: 5.2, color: "#e07a90" },
+  ],
+  areas: [
+    { label: "Galle", count: 124 },
+    { label: "Matara", count: 98 },
+    { label: "Hambantota", count: 90 },
+  ],
+  sources: [
+    { label: "WhatsApp", count: 96 },
+    { label: "Phone call", count: 72 },
+    { label: "SMS", count: 56 },
+    { label: "Email", count: 42 },
+    { label: "Letter", count: 26 },
+    { label: "Walk-in", count: 20 },
+  ],
+  rejections: [
+    { label: "Duplicate of earlier case", count: 5 },
+    { label: "Out of jurisdiction", count: 4 },
+    { label: "Spam or invalid", count: 3 },
+  ],
+  overdue: [
+    { ref: "C-2026-00405", title: "Assault allegation at Galle stand", area: "Galle", step: "Decide by passed", severity: "critical", overdueBy: "Overdue 3 h" },
+    { ref: "C-2026-00352", title: "Operator overcharging on every trip", area: "Hambantota", step: "Decide by passed", severity: "high", overdueBy: "Overdue 2 d" },
+    { ref: "C-2026-00339", title: "Timetable not kept on Route 349", area: "Matara", step: "Close by passed", severity: "medium", overdueBy: "Overdue 4 d" },
+  ],
+  onTime: [
+    { label: "Forwarded on time", percent: 94 },
+    { label: "Decided on time", percent: 81 },
+    { label: "Closed on time", percent: 77 },
+  ],
+  approvals: [
+    {
+      ref: "C-2026-00322",
+      action: "Written warning",
+      title: "Conductor shouted at passengers",
+      doneBy: "R. Gunasekara, operations manager",
+      when: "2 h ago",
+      note: "Warning handed over and signed by the conductor.",
+    },
+    {
+      ref: "C-2026-00318",
+      action: "Suspension, 5 days",
+      title: "Driver ignored a stop request",
+      doneBy: "T. Ratnayake, depot supervisor",
+      when: "yesterday",
+      note: "Suspension served from 3 to 8 Nov. Duty roster updated.",
+    },
+  ],
+  ratings: [
+    { name: "A. Fernando", role: "Driver · Route 350", substantiated: 0, pending: 0, commendations: 3, score: 100, band: "Excellent" },
+    { name: "N. Perera", role: "Conductor · Bus NB-3310", substantiated: 1, pending: 0, commendations: 2, score: 94, band: "Excellent" },
+    { name: "D. Wijesekara", role: "SPRPTA stand supervisor · Galle", substantiated: 1, pending: 0, commendations: 0, score: 95, band: "Excellent" },
+    { name: "M. Jayasuriya", role: "Driver · Trishaw TW-1920", substantiated: 1, pending: 0, commendations: 1, score: 82, band: "Good" },
+    { name: "K. Silva", role: "Driver · Bus NB-4521", substantiated: 2, pending: 1, commendations: 0, score: 70, band: "Needs improvement" },
+    { name: "R. Bandara", role: "Conductor · Bus NB-2204", substantiated: 2, pending: 0, commendations: 0, score: 40, band: "Poor" },
+  ],
+  bands: [
+    { band: "Excellent", range: "90 to 100", count: 41 },
+    { band: "Good", range: "75 to 89", count: 28 },
+    { band: "Needs improvement", range: "60 to 74", count: 12 },
+    { band: "Poor", range: "Below 60", count: 4 },
+  ],
+  appeals: [
+    {
+      title: "Appeal about the rating of K. Silva",
+      when: "2 d ago",
+      detail: "Says C-2026-00288 was marked substantiated but the complaint was about another driver of the same bus.",
+      action: "Re-link to another person",
+    },
+    {
+      title: "Appeal about the rating of R. Bandara",
+      when: "today",
+      detail: "Asks for the outcome of C-2026-00251 to be reviewed.",
+      action: "Correct the outcome",
+    },
+  ],
+  recommendationStatuses: [
+    { label: "New", count: 3 },
+    { label: "Acknowledged", count: 4 },
+    { label: "Under consideration", count: 2 },
+    { label: "Accepted or implemented", count: 5 },
+    { label: "Declined", count: 1 },
+    { label: "Commendation verified", count: 6 },
+  ],
+  recommendations: [
+    { ref: "R-2026-0038", title: "Shaded benches at Matara bus stand", kind: "Improvement", enteredBy: "Nadeesha K.", status: "New" },
+    { ref: "R-2026-0036", title: "Extra evening trips on Route 350", kind: "Improvement", enteredBy: "Dilini F.", status: "Under consideration" },
+    { ref: "R-2026-0035", title: "Fare chart displayed inside trishaws", kind: "Improvement", enteredBy: "Nadeesha K.", status: "Acknowledged" },
+    { ref: "R-2026-0034", title: "Conductor praised for helping a wheelchair user", kind: "Commendation", enteredBy: "Nadeesha K.", status: "New" },
+  ],
+  audit: [
+    { time: "10:42:18", user: "Dr. Perera", text: "Opened case", ref: "C-2026-00403" },
+    { time: "10:31:05", user: "Chaminda R.", text: "Escalated to Level 3 with a reason,", ref: "C-2026-00341" },
+    { time: "10:12:44", user: "Sunil D.", text: "Recorded a decision on", ref: "C-2026-00398" },
+    { time: "09:58:30", user: "Nadeesha K.", text: "Forwarded to the Galle officer,", ref: "C-2026-00417" },
+    { time: "09:31:09", user: "System", text: "Decision message sent for", ref: "C-2026-00416" },
+    { time: "09:12:02", user: "Anusha P.", text: "Escalated to Level 3 with a reason,", ref: "C-2026-00403" },
+  ],
+};

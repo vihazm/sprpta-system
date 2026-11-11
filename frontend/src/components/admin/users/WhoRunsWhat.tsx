@@ -1,5 +1,5 @@
-import { bigNumber } from "../dashboard/ui";
-import { Icon } from "./icons";
+import { bigNumber } from "@/components/dashboard/ui";
+import { Icon } from "@/components/dashboard/icons";
 import type { StatusFilter } from "./staff";
 import type { UsersSummary } from "./types";
 

@@ -1,5 +1,5 @@
 import type { AreaStatus } from "./types";
-import { Card, CardHeading, StatusDot, muted } from "./ui";
+import { Card, CardHeading, StatusDot, muted } from "@/components/dashboard/ui";
 
 export function AreaCoverage({ areas, className = "" }: { areas: AreaStatus[]; className?: string }) {
   return (

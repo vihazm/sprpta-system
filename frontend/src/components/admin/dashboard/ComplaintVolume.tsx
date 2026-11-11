@@ -1,7 +1,7 @@
 import { AreaChart } from "./AreaChart";
 import { sum } from "./format";
 import type { AdminDashboardData } from "./types";
-import { Card, CardHeading, Chip, bigNumber, muted } from "./ui";
+import { Card, CardHeading, Chip, bigNumber, muted } from "@/components/dashboard/ui";
 
 // Colours for the status bar, in the order the statuses are listed.
 const STATUS_COLORS = [

@@ -1,5 +1,5 @@
 import type { AdminDashboardData } from "./types";
-import { Card, CardHeading, Chip } from "./ui";
+import { Card, CardHeading, Chip } from "@/components/dashboard/ui";
 
 export function MessageDelivery({
   messages,

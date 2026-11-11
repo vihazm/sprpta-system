@@ -2,16 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Card, Chip, StatusDot, muted } from "../dashboard/ui";
+import { Card, Chip, StatusDot, muted } from "@/components/dashboard/ui";
 import { AreaCoverage } from "./AreaCoverage";
 import { Collapse } from "./Collapse";
 import { CoverageStrip } from "./CoverageStrip";
 import { EditUserPanel, type Preset } from "./EditUserPanel";
 import { WhoRunsWhat } from "./WhoRunsWhat";
 import { loadUsers } from "./api";
-import { iconButton } from "./controls";
+import { iconButton } from "@/components/dashboard/controls";
 import { formatWhen } from "./format";
-import { Icon } from "./icons";
+import { Icon } from "@/components/dashboard/icons";
 import {
   AVATAR_TINT,
   ROLE_ORDER,

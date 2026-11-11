@@ -33,8 +33,6 @@ export const ROLE_PREFIX: Record<Role, string> = {
   cp: "/cp",
 };
 
-export const PROTECTED_PREFIXES = Object.values(ROLE_PREFIX);
-
 export function isRole(value: unknown): value is Role {
   return typeof value === "string" && value in LANDING_PATH;
 }

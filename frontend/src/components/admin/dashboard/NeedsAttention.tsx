@@ -1,5 +1,5 @@
 import type { AttentionItem, Tone } from "./types";
-import { Card, Chip, PillButton, StatusDot, TONE_BG, muted } from "./ui";
+import { Card, Chip, PillButton, StatusDot, TONE_BG, muted } from "@/components/dashboard/ui";
 
 const TONE_LABEL: Record<Tone, string> = {
   crit: "Critical",
