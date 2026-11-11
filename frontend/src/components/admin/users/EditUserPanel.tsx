@@ -3,11 +3,11 @@
 import { useState, type FormEvent } from "react";
 import { ROLE_LABEL } from "@/lib/roles";
 import { notify } from "@/lib/notify";
-import { Card, eyebrow, muted } from "../dashboard/ui";
+import { Card, eyebrow, muted } from "@/components/dashboard/ui";
 import { createUser, unlockUser, updateUser } from "./api";
-import { Field, iconButton, inputClass } from "./controls";
+import { Field, iconButton, inputClass } from "@/components/dashboard/controls";
 import { formatDay, formatWhen } from "./format";
-import { Icon } from "./icons";
+import { Icon } from "@/components/dashboard/icons";
 import { AVATAR_TINT, ROLE_ORDER, initials } from "./staff";
 import type { AreaOfficer, StaffRole, StaffUser } from "./types";
 

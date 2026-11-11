@@ -1,4 +1,4 @@
-import { Card, Chip, StatusDot, muted } from "../dashboard/ui";
+import { Card, Chip, StatusDot, muted } from "@/components/dashboard/ui";
 import type { UsersSummary } from "./types";
 
 // What the two boxes shrink to while the form is open, so coverage stays in sight.

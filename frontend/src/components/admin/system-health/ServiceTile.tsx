@@ -1,6 +1,6 @@
 import { AreaChart } from "../dashboard/AreaChart";
 import type { Tone } from "../dashboard/types";
-import { Card, CardHeading, Chip, StatusDot, bigNumber, muted } from "../dashboard/ui";
+import { Card, CardHeading, Chip, StatusDot, bigNumber, muted } from "@/components/dashboard/ui";
 import type { ServiceMetric } from "./types";
 
 const TREND_COLOR: Record<Tone, string> = {

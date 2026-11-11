@@ -1,5 +1,5 @@
 import { PulseHero } from "../dashboard/PulseHero";
-import { Card, muted } from "../dashboard/ui";
+import { Card, muted } from "@/components/dashboard/ui";
 import { ChecksTile } from "./ChecksTile";
 import { PendingTile } from "./PendingTile";
 import { RecentEvents } from "./RecentEvents";

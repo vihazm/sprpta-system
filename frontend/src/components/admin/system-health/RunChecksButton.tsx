@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { notify } from "@/lib/notify";
-import { PillButton } from "../dashboard/ui";
+import { PillButton } from "@/components/dashboard/ui";
 import { runChecks } from "./api";
 
 export function RunChecksButton() {

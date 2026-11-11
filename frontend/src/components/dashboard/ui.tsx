@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import type { Tone } from "./types";
+// Small building blocks shared by the dashboards of every role.
 
-// Small building blocks shared by the dashboard tiles.
+export type Tone = "ok" | "warn" | "crit" | "info";
 
 type ChipTone = Tone | "brand";
 
@@ -65,6 +65,18 @@ export function CardHeading({
       </div>
       {action}
     </div>
+  );
+}
+
+// A text link such as "See all". The screens it opens are still to be built.
+export function LinkButton({ children }: { children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="focus-ring cursor-pointer whitespace-nowrap text-[0.78rem] font-extrabold text-crimson-hover hover:underline"
+    >
+      {children}
+    </button>
   );
 }
 

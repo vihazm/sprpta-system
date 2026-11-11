@@ -1,4 +1,4 @@
-import { Card, CardHeading, Chip, StatusDot, bigNumber, muted } from "../dashboard/ui";
+import { Card, CardHeading, Chip, StatusDot, bigNumber, muted } from "@/components/dashboard/ui";
 import { AVATAR_TINT, initials } from "./staff";
 import type { AreaOfficer } from "./types";
 
