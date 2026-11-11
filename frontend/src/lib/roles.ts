@@ -93,7 +93,7 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Message templates" },
     { label: "Policy documents" },
     { label: "Settings" },
-    { label: "System health" },
+    { label: "System health", href: "/admin/system-health" },
     { label: "Usage logs" },
     { label: "Statistics and reports" },
   ],

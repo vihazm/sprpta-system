@@ -15,7 +15,6 @@ export const adminDashboardSample: AdminDashboardData = {
     118, 112, 121, 108, 115, 104, 120, 98, 110, 117, 95, 106, 92, 112, 104, 118, 90, 108, 102,
     114, 86, 104, 96, 110,
   ],
-  lastBackup: { when: "today 02:00", succeeded: true },
   attention: [
     {
       title: "Hambantota has no active Level 2 officer",

@@ -6,6 +6,8 @@ sample data for the rest until those modules exist.
 
 from pydantic import BaseModel
 
+from app.schemas.system_health import ServiceStatus
+
 
 class Count(BaseModel):
     label: str
@@ -39,3 +41,5 @@ class AdminDashboard(BaseModel):
     sign_ins_per_hour: list[int]  # last 24 hours, oldest first, the last one is the current hour
     current_hour: int  # 0 to 23, local time
     recent_usage: list[UsageEvent]
+    services: list[ServiceStatus]  # the ones the backend can check itself
+    api_response_ms: list[int]  # last 24 hours, oldest first

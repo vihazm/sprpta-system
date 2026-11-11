@@ -40,12 +40,14 @@ export type LiveDashboardData = Pick<
   | "signInsPerHour"
   | "currentHour"
   | "recentUsage"
+  | "services"
+  | "apiResponseMs"
 >;
 
 export type AdminDashboardData = {
   services: Service[];
   apiResponseMs: number[]; // last 24 hours, oldest first
-  lastBackup: { when: string; succeeded: boolean };
+  lastBackup?: { when: string; succeeded: boolean }; // none until backups are recorded
   attention: AttentionItem[]; // most urgent first
   sessions: {
     signedInNow: number;
