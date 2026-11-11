@@ -6,12 +6,12 @@ administrator must never receive personal data.
 """
 
 from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.core.roles import UserRole
+from app.core.timezone import LOCAL, LOCAL_TIMEZONE
 from app.models import AuthSession, ComplainantAccount, UsageLog, User
 from app.schemas.admin_dashboard import (
     AdminDashboard,
@@ -20,9 +20,8 @@ from app.schemas.admin_dashboard import (
     Sessions,
     UsageEvent,
 )
+from app.services import system_health_service
 
-LOCAL_TIMEZONE = "Asia/Colombo"
-LOCAL = ZoneInfo(LOCAL_TIMEZONE)
 HOURS_SHOWN = 24
 RECENT_EVENTS_SHOWN = 6
 
@@ -149,4 +148,6 @@ def build_dashboard(db: Session) -> AdminDashboard:
         sign_ins_per_hour=per_hour,
         current_hour=current_hour,
         recent_usage=recent_usage(db),
+        services=system_health_service.service_statuses(db, now),
+        api_response_ms=system_health_service.api_response_series(db, now),
     )

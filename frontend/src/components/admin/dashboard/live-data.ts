@@ -2,6 +2,8 @@ import "server-only";
 
 import { cookies } from "next/headers";
 import { ACCESS_COOKIE, API_URL } from "@/lib/auth-constants";
+import { toHealthService } from "../system-health/api";
+import { heroServices } from "../system-health/status";
 import type { LiveDashboardData } from "./types";
 
 /**
@@ -38,5 +40,7 @@ export async function getLiveData(): Promise<LiveDashboardData | null> {
     signInsPerHour: body.sign_ins_per_hour,
     currentHour: body.current_hour,
     recentUsage: body.recent_usage,
+    services: heroServices(body.services.map(toHealthService)),
+    apiResponseMs: body.api_response_ms,
   };
 }

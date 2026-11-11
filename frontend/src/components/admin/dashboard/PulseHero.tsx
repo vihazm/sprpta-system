@@ -38,12 +38,16 @@ export function PulseHero({
 }: {
   services: Service[];
   apiResponseMs: number[];
-  lastBackup: { when: string; succeeded: boolean };
+  lastBackup?: { when: string; succeeded: boolean }; // left out until backups are recorded
   className?: string;
 }) {
   const healthy = services.filter((s) => s.tone === "ok").length;
   const problem = services.find((s) => s.tone !== "ok");
-  const headline = services.some((s) => s.tone === "crit") ? "Needs attention" : "Running smoothly";
+  const headline = services.some((s) => s.tone === "crit")
+    ? "Needs attention"
+    : problem
+      ? "One thing to watch"
+      : "Running smoothly";
 
   return (
     <section
@@ -104,29 +108,37 @@ export function PulseHero({
           <span className="rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
             API response time, 24 hours
           </span>
-          <span className="inline-flex items-center gap-[0.4rem] rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-              className="text-emerald-300"
-            >
-              <path d="M5 12.5l4.5 4.5L19 7.5" />
-            </svg>
-            Last backup {lastBackup.when}, {lastBackup.succeeded ? "successful" : "failed"}
-          </span>
+          {lastBackup && (
+            <span className="inline-flex items-center gap-[0.4rem] rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="text-emerald-300"
+              >
+                <path d="M5 12.5l4.5 4.5L19 7.5" />
+              </svg>
+              Last backup {lastBackup.when}, {lastBackup.succeeded ? "successful" : "failed"}
+            </span>
+          )}
         </div>
-        <AreaChart
-          values={apiResponseMs}
-          label="API response time over the last 24 hours"
-          className="h-[5.25rem] text-white"
-        />
+        {apiResponseMs.length > 1 ? (
+          <AreaChart
+            values={apiResponseMs}
+            label="API response time over the last 24 hours"
+            className="h-[5.25rem] text-white"
+          />
+        ) : (
+          <p className="flex h-[5.25rem] items-end px-8 pb-3 text-[0.78rem] text-white/70">
+            Collecting API response times…
+          </p>
+        )}
       </div>
     </section>
   );
