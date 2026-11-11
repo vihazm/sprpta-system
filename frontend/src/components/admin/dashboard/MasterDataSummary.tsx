@@ -1,6 +1,6 @@
 import { formatNumber, plural } from "./format";
 import type { AdminDashboardData } from "./types";
-import { Card, CardHeading, Chip } from "./ui";
+import { Card, CardHeading, Chip } from "@/components/dashboard/ui";
 
 function Tile({ label, value, tint }: { label: string; value: number; tint: string }) {
   return (

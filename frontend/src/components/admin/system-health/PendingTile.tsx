@@ -1,4 +1,4 @@
-import { Card, CardHeading, Chip, muted } from "../dashboard/ui";
+import { Card, CardHeading, Chip, muted } from "@/components/dashboard/ui";
 
 // A service that cannot be checked yet. It says so, instead of showing made-up numbers.
 export function PendingTile({

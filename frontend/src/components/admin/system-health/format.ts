@@ -1,4 +1,4 @@
-import { TIME_ZONE } from "../users/format";
+import { TIME_ZONE } from "@/components/dashboard/dates";
 
 // Small formatters for the System health page. Times are shown in Sri Lankan time.
 

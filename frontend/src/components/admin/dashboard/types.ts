@@ -1,7 +1,9 @@
 // Shapes of the figures shown on the administrator dashboard.
 // They follow the System Flow, UI Flow and Database Structure documents.
 
-export type Tone = "ok" | "warn" | "crit" | "info";
+import type { Tone } from "@/components/dashboard/ui";
+
+export type { Tone };
 
 export type Service = { name: string; detail: string; tone: Tone };
 

@@ -1,6 +1,6 @@
 import { formatNumber, plural } from "./format";
 import type { AdminDashboardData } from "./types";
-import { Card, CardHeading, Chip, bigNumber, muted } from "./ui";
+import { Card, CardHeading, Chip, bigNumber, muted } from "@/components/dashboard/ui";
 
 export function PolicyLibrary({
   policy,

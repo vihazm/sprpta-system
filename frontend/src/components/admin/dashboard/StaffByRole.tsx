@@ -1,6 +1,6 @@
 import { sum } from "./format";
 import type { Count } from "./types";
-import { Card, CardHeading, Chip, bigNumber } from "./ui";
+import { Card, CardHeading, Chip, bigNumber } from "@/components/dashboard/ui";
 
 // Each role gets its own soft tint and bar colour, in the order the roles are listed.
 const TILE_TINTS = ["bg-crimson/10", "bg-crimson/5", "bg-stone-100", "bg-slate-100", "bg-stone-100"];

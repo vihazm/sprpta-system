@@ -1,5 +1,5 @@
 import type { AdminDashboardData } from "./types";
-import { PillButton, eyebrow } from "./ui";
+import { PillButton, eyebrow } from "@/components/dashboard/ui";
 
 export function Shortcuts({
   timeTargets,

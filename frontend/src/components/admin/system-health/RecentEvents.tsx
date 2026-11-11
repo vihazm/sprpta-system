@@ -1,4 +1,4 @@
-import { Card, CardHeading, Chip, StatusDot, muted } from "../dashboard/ui";
+import { Card, CardHeading, Chip, StatusDot, muted } from "@/components/dashboard/ui";
 import { formatEventTime } from "./format";
 import type { HealthEvent } from "./types";
 

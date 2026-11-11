@@ -12,7 +12,7 @@ import { SignedInNow } from "./SignedInNow";
 import { StaffByRole } from "./StaffByRole";
 import { getLiveData } from "./live-data";
 import { adminDashboardSample } from "./sample-data";
-import { Card, Chip, muted } from "./ui";
+import { Card, Chip, muted } from "@/components/dashboard/ui";
 
 // The content of the administrator dashboard (UI-AD-01). One column on narrow
 // screens, a 12-column bento grid from 1200px up.

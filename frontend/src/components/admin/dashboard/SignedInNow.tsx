@@ -1,4 +1,4 @@
-import { bigNumber } from "./ui";
+import { bigNumber } from "@/components/dashboard/ui";
 
 type Sessions = {
   signedInNow: number;

@@ -1,4 +1,4 @@
-import { Card, bigNumber, eyebrow } from "../dashboard/ui";
+import { Card, bigNumber, eyebrow } from "@/components/dashboard/ui";
 import { ROLE_ORDER } from "./staff";
 import type { UsersSummary } from "./types";
 
