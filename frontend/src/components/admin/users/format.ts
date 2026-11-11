@@ -1,5 +1,5 @@
 // Dates are shown in Sri Lankan time, whatever the browser's own zone is.
-const TIME_ZONE = "Asia/Colombo";
+export const TIME_ZONE = "Asia/Colombo";
 
 const dayKey = (date: Date) => date.toLocaleDateString("en-CA", { timeZone: TIME_ZONE });
 const clock = (date: Date) =>

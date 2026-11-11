@@ -68,15 +68,19 @@ export function CardHeading({
   );
 }
 
-// These buttons are not wired up yet: the screens they open are still to be built.
+// Without an onClick the button does nothing yet: the screen it opens is still to be built.
 export function PillButton({
   children,
   primary = false,
   className = "",
+  onClick,
+  disabled = false,
 }: {
   children: ReactNode;
   primary?: boolean;
   className?: string;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
   const look = primary
     ? "border-crimson bg-crimson text-white hover:bg-crimson-hover"
@@ -84,7 +88,9 @@ export function PillButton({
   return (
     <button
       type="button"
-      className={`focus-ring inline-flex h-[2.1rem] cursor-pointer items-center justify-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-[0.95rem] text-[0.78rem] font-bold transition-colors ${look} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+      className={`focus-ring inline-flex h-[2.1rem] cursor-pointer items-center justify-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-[0.95rem] text-[0.78rem] font-bold transition-colors disabled:cursor-wait disabled:opacity-60 ${look} ${className}`}
     >
       {children}
     </button>

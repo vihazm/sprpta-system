@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     session_absolute_hours: int = 12
     refresh_grace_seconds: int = 10
 
+    # --- health checks: where the web app can be reached from the backend ---
+    web_url: str = "http://localhost:3000"
+
     # --- lockout and rate limiting ---
     max_failed_logins: int = 5
     lockout_minutes: int = 15
