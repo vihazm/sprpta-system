@@ -9,11 +9,18 @@
 - Production: one admin from ADMIN_LOGIN / ADMIN_PASSWORD / ADMIN_NAME (set in
   the environment, never committed). The password is not defined by the
   documents ([OPEN] in the UI Flow doc), so it comes from the environment.
+
+The development passwords below are public demo values. To give an account a
+different one without committing it, set SEED_PASSWORD_<NAME> in backend/.env,
+where <NAME> is the part of the login before the "@" in capitals, for example
+SEED_PASSWORD_SHAMILA_AD_MATARA=...
 """
 
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 
+from dotenv import dotenv_values
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -31,7 +38,10 @@ AREAS = ["Galle", "Matara", "Hambantota"]
 DEV_STAFF = [
     # (full name, login, role, area, password)
     ("Test Chairman", "test_chairman@sprpta.test", UserRole.L3, None, "chairman123"),
-    ("Test Area Officer (Galle)", "test_ad_galle@sprpta.test", UserRole.L2, "Galle", "ad_galle123"),
+    # One active L2 officer per area, so forwarding by area finds exactly one.
+    ("Gihan Samaraweera", "gihan_ad_galle@sprpta.test", UserRole.L2, "Galle", "ad_galle123"),
+    ("Shamila Liyanarachchi", "shamila_ad_matara@sprpta.test", UserRole.L2, "Matara", "ad_matara123"),
+    ("Kavindya Sewwandi", "kavindya_ad_hambantota@sprpta.test", UserRole.L2, "Hambantota", "ad_hambantota123"),
     ("Test Office Staff", "test_office@sprpta.test", UserRole.L1, None, "office123"),
     ("System Admin", "system_admin@sprpta.test", UserRole.ADMIN, None, "admin123"),
     ("Test Ground Staff", "test_groundstaff@sprpta.test", UserRole.IMPLEMENTING_STAFF, None, "groundstaff123"),
@@ -40,6 +50,13 @@ DEV_COMPLAINANTS = [
     # (display name, email, password)
     ("Test Client", "test_client1@sprpta.test", "client1abc"),
 ]
+
+
+def _dev_password(login: str, demo_password: str) -> str:
+    """The SEED_PASSWORD_<NAME> override from the environment or backend/.env, else the demo password."""
+    key = "SEED_PASSWORD_" + login.split("@")[0].upper()
+    env_file = Path(__file__).resolve().parents[2] / ".env"
+    return os.environ.get(key) or dotenv_values(env_file).get(key) or demo_password
 
 
 def _area_ids(db: Session) -> dict[str, int]:
@@ -75,7 +92,7 @@ def main() -> None:
         if settings.is_development:
             print("Development accounts")
             for name, login, role, area, password in DEV_STAFF:
-                _ensure_staff(db, name, login, role, areas[area] if area else None, password)
+                _ensure_staff(db, name, login, role, areas[area] if area else None, _dev_password(login, password))
             for name, email, password in DEV_COMPLAINANTS:
                 if db.scalar(select(ComplainantAccount).where(ComplainantAccount.email == email)) is None:
                     db.add(

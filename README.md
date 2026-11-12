@@ -64,7 +64,9 @@ Open http://localhost:3000 and sign in.
 | Role | Login | Password | Lands on |
 | --- | --- | --- | --- |
 | Level 3 chairman | `test_chairman@sprpta.test` | `chairman123` | `/l3/dashboard` |
-| Level 2 area officer (Galle) | `test_ad_galle@sprpta.test` | `ad_galle123` | `/l2/dashboard` |
+| Level 2 area officer (Galle) | `gihan_ad_galle@sprpta.test` | `ad_galle123` | `/l2/dashboard` |
+| Level 2 area officer (Matara) | `shamila_ad_matara@sprpta.test` | `ad_matara123` | `/l2/dashboard` |
+| Level 2 area officer (Hambantota) | `kavindya_ad_hambantota@sprpta.test` | `ad_hambantota123` | `/l2/dashboard` |
 | Level 1 office staff | `test_office@sprpta.test` | `office123` | `/l1/dashboard` |
 | System administrator | `system_admin@sprpta.test` | `admin123` | `/admin/dashboard` |
 | Implementing staff | `test_groundstaff@sprpta.test` | `groundstaff123` | `/is/cases` |
