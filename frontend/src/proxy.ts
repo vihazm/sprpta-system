@@ -5,7 +5,7 @@ import {
   REFRESH_COOKIE,
   REFRESH_COOKIE_PATH,
 } from "@/lib/auth-constants";
-import { LANDING_PATH, isRole, safeNextPath } from "@/lib/roles";
+import { LANDING_PATH, isRole, roleForPath, safeNextPath } from "@/lib/roles";
 
 /**
  * Optimistic route guard plus silent token renewal.
@@ -13,23 +13,38 @@ import { LANDING_PATH, isRole, safeNextPath } from "@/lib/roles";
  * - Role pages: with no session cookie, go to the login page. When the access
  *   token has expired, quietly swap the refresh token for a new one (cookies
  *   can only be set here, not in server components).
+ * - Role pages: a user in another role's area is sent to their own landing page
+ *   before anything is rendered, so the other area's page is never streamed.
  * - Login page ("/"): a signed-in user is sent straight to their own area.
  *
- * This is not the security boundary. Server components re-check the session
- * with the backend (lib/session.ts) and the backend checks every API call.
+ * This is not the security boundary. The token is only decoded here, not
+ * verified. Server components re-check the session with the backend
+ * (lib/session.ts) and the backend checks every API call.
  */
 
 type Renewed = { setCookies: string[]; access: string | null; refresh: string | null };
 
-function isFresh(token: string | undefined): boolean {
-  if (!token) return false;
+function readToken(token: string | undefined): { exp?: number; role?: string } | null {
+  if (!token) return null;
   try {
     const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const { exp } = JSON.parse(atob(payload)) as { exp?: number };
-    return typeof exp === "number" && exp * 1000 > Date.now() + 5_000;
+    return JSON.parse(atob(payload));
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isFresh(token: string | undefined): boolean {
+  const exp = readToken(token)?.exp;
+  return typeof exp === "number" && exp * 1000 > Date.now() + 5_000;
+}
+
+/** A redirect to the user's own landing page when this path is another role's area. */
+function wrongArea(request: NextRequest, token: string | undefined): NextResponse | null {
+  const role = readToken(token)?.role;
+  const area = roleForPath(request.nextUrl.pathname);
+  if (!isRole(role) || area === null || area === role) return null;
+  return NextResponse.redirect(new URL(`${LANDING_PATH[role]}?denied=1`, request.url));
 }
 
 function cookieValue(setCookie: string): [string, string] {
@@ -101,11 +116,18 @@ async function guardRolePage(request: NextRequest): Promise<NextResponse> {
   const access = request.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
 
-  if (isFresh(access)) return NextResponse.next();
+  if (isFresh(access)) return wrongArea(request, access) ?? NextResponse.next();
   if (!access && !refresh) return toLogin(request);
 
   const renewed = refresh ? await renew(refresh) : null;
-  if (renewed) return proceedWith(request, renewed);
+  if (renewed) {
+    const away = wrongArea(request, renewed.access ?? undefined);
+    if (away) {
+      renewed.setCookies.forEach((c) => away.headers.append("set-cookie", c));
+      return away;
+    }
+    return proceedWith(request, renewed);
+  }
   return clearAuthCookies(toLogin(request, "expired"));
 }
 

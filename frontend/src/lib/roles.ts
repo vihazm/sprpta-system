@@ -38,7 +38,7 @@ export function isRole(value: unknown): value is Role {
 }
 
 /** Which role's area a path belongs to, or null for public paths. */
-function roleForPath(pathname: string): Role | null {
+export function roleForPath(pathname: string): Role | null {
   for (const role of Object.keys(ROLE_PREFIX) as Role[]) {
     const prefix = ROLE_PREFIX[role];
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return role;
