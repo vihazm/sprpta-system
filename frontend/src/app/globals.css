@@ -16,8 +16,7 @@
   --color-ok-glow: #34d399;
   --color-bad-glow: #f87171;
   --animate-island-in: island-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-  --font-sans: var(--font-jakarta), system-ui, sans-serif;
-  --font-display: var(--font-bricolage), var(--font-jakarta), system-ui, sans-serif;
+  --font-display: var(--font-baskerville), Georgia, serif;
 }
 
 /* The whole UI is rem-based, so it scales with the screen height:
@@ -32,6 +31,12 @@ body {
   color: #16181d;
   font-family: var(--font-jakarta), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Headlines and big numbers use Libre Baskerville. The tight tracking set on those
+   elements suited the old sans display font and crowds a serif, so it is eased here. */
+.font-display {
+  letter-spacing: -0.012em !important;
 }
 
 @keyframes island-in {

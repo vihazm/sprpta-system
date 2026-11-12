@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Plus_Jakarta_Sans } from "next/font/google";
+import { Libre_Baskerville, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "@/components/notify/Toaster";
 import "./globals.css";
 
@@ -9,10 +9,10 @@ const jakarta = Plus_Jakarta_Sans({
   weight: ["400", "500", "600", "700", "800"],
 });
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+const baskerville = Libre_Baskerville({
+  variable: "--font-baskerville",
   subsets: ["latin"],
-  weight: ["700"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -25,7 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${jakarta.variable} ${bricolage.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${baskerville.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}

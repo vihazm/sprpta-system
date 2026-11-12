@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { ACCESS_COOKIE, API_URL } from "@/lib/auth-constants";
 import { LANDING_PATH, isRole, type Role } from "@/lib/roles";
 
-export type SessionUser = {
+type SessionUser = {
   id: number;
   name: string;
   role: Role;

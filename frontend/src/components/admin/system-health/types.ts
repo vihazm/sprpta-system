@@ -15,7 +15,7 @@ export type HealthService = {
   latencyMs: number | null;
 };
 
-export type Outage = {
+type Outage = {
   serviceName: string;
   startedAt: string;
   minutes: number | null; // null while it is still going on

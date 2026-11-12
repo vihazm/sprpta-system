@@ -9,7 +9,7 @@
 // client component or event handler can call this without extra setup.
 // Use it instead of alert(), confirm() or the browser's own form bubbles.
 
-export type NotifyKind = "success" | "error";
+type NotifyKind = "success" | "error";
 
 export type Toast = {
   id: number;
@@ -20,7 +20,7 @@ export type Toast = {
   duration: number;
 };
 
-export type NotifyOptions = { duration?: number };
+type NotifyOptions = { duration?: number };
 
 const DEFAULT_DURATION: Record<NotifyKind, number> = {
   success: 4000,

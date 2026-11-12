@@ -3,7 +3,7 @@
 
 import { isRole, type Role } from "@/lib/roles";
 
-export type SignInResult =
+type SignInResult =
   | { ok: true; role: Role; name: string; redirectTo: string }
   | { ok: false; title: string; message: string; code?: string; retryAfter?: number };
 
