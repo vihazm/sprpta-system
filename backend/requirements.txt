@@ -59,7 +59,6 @@ requests==2.34.2
 rich==15.0.0
 rich-toolkit==0.20.6
 rignore==0.8.1
-sentry-sdk==2.74.0
 shellingham==1.5.4
 SQLAlchemy==2.1.8
 starlette==1.10.0

@@ -24,7 +24,7 @@ export const LANDING_PATH: Record<Role, string> = {
 };
 
 // First URL segment of each role's area, used for route guards.
-export const ROLE_PREFIX: Record<Role, string> = {
+const ROLE_PREFIX: Record<Role, string> = {
   l1: "/l1",
   l2: "/l2",
   l3: "/l3",
@@ -38,7 +38,7 @@ export function isRole(value: unknown): value is Role {
 }
 
 /** Which role's area a path belongs to, or null for public paths. */
-export function roleForPath(pathname: string): Role | null {
+function roleForPath(pathname: string): Role | null {
   for (const role of Object.keys(ROLE_PREFIX) as Role[]) {
     const prefix = ROLE_PREFIX[role];
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) return role;
