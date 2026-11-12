@@ -69,7 +69,8 @@ def _clean():
         db.execute(
             text(
                 "TRUNCATE usage_logs, auth_sessions, users, complainant_accounts, areas, "
-                "health_checks, health_events "
+                "health_checks, health_events, people, severities, complaint_categories, "
+                "complaint_mediums, system_settings "
                 "RESTART IDENTITY CASCADE"
             )
         )
