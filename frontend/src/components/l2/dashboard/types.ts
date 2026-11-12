@@ -30,7 +30,7 @@ export type UrgentCase = {
   overdue: boolean;
 };
 
-export type SentMessage = { ref: string; text: string; time: string; failed: boolean };
+type SentMessage = { ref: string; text: string; time: string; failed: boolean };
 
 export type RecommendationItem = { ref: string; title: string; kind: string; status: string };
 

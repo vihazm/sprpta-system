@@ -21,7 +21,7 @@ export type TransportMode = { label: string; cases: number; closedPercent: numbe
 
 export type Count = { label: string; count: number };
 
-export type OverdueCase = {
+type OverdueCase = {
   ref: string;
   title: string;
   area: string;
