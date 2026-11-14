@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icon } from "./icons";
 
@@ -53,16 +54,27 @@ export function DashboardHero({
 }
 
 // A white button for the hero's main action, and a see-through one for the second.
-export function HeroButton({ children, filled = false }: { children: ReactNode; filled?: boolean }) {
-  return (
-    <button
-      type="button"
-      className={`focus-ring inline-flex h-[2.6rem] cursor-pointer items-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-5 text-[0.78rem] font-bold transition-colors ${
-        filled
-          ? "border-white bg-white text-crimson-hover hover:bg-white/90"
-          : "border-white/60 text-white hover:bg-white/10"
-      }`}
-    >
+// With an href it is a link to that screen.
+export function HeroButton({
+  children,
+  filled = false,
+  href,
+}: {
+  children: ReactNode;
+  filled?: boolean;
+  href?: string;
+}) {
+  const className = `focus-ring inline-flex h-[2.6rem] cursor-pointer items-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-5 text-[0.78rem] font-bold transition-colors ${
+    filled
+      ? "border-white bg-white text-crimson-hover hover:bg-white/90"
+      : "border-white/60 text-white hover:bg-white/10"
+  }`;
+  return href ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <button type="button" className={className}>
       {children}
     </button>
   );

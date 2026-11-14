@@ -2,25 +2,6 @@ import type { Severity } from "@/components/dashboard/severity";
 
 // Shapes used by the Level 1 office staff dashboard (UC-L1-12).
 
-export type ComplaintDraft = {
-  name: string;
-  contact: string;
-  received: string;
-  medium: string;
-  transport: "Bus" | "Trishaw";
-  vehicle: string;
-  about: string; // who the complaint is about: driver, conductor or SPRPTA staff
-  route: string; // filled in from the vehicle record
-  area: string; // the vehicle's registered area
-  lookup: { permit: string; owner: string; pastComplaints: number };
-  subject: string;
-  category: string;
-  description: string;
-  severity: Severity;
-  attachments: string[];
-  duplicate: { ref: string; summary: string; match: number };
-};
-
 export type QueueKind = "portal" | "drafts" | "incomplete" | "duplicates";
 
 export type QueueCount = { kind: QueueKind; title: string; note: string; count: number };
@@ -49,7 +30,6 @@ export type ForwardedCase = {
 
 export type L1DashboardData = {
   day: { entered: number; forwarded: number; stillOpen: number; thisWeek: number; thisMonth: number };
-  draft: ComplaintDraft;
   queues: QueueCount[];
   waiting: WaitingCase[];
   portal: PortalSubmission[];

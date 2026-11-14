@@ -33,11 +33,11 @@ export async function L1Dashboard() {
         intro={`${portal} portal submissions are waiting for your check, and ${open - portal} drafts and incomplete cases are still open.`}
         actions={
           <>
-            <HeroButton filled>
+            <HeroButton filled href="/l1/new-complaint">
               <Icon name="plus" size={14} />
               Log a new complaint
             </HeroButton>
-            <HeroButton>Log a recommendation</HeroButton>
+            <HeroButton href="/l1/new-recommendation">Log a recommendation</HeroButton>
             <ReferenceSearch />
           </>
         }
@@ -51,7 +51,7 @@ export async function L1Dashboard() {
       />
 
       <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">
-        <QuickEntry draft={data.draft} className="min-[1200px]:col-span-8" />
+        <QuickEntry className="min-[1200px]:col-span-8" />
         <div className="flex min-w-0 flex-col gap-4 min-[1200px]:col-span-4">
           <NeedsAttention queues={data.queues} waiting={data.waiting} />
           <PortalQueue submissions={data.portal} className="flex-1" />

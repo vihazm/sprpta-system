@@ -66,8 +66,8 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Dashboard", href: "/l1/dashboard" },
     { label: "Complaints" },
     { label: "Portal submissions" },
-    { label: "New complaint" },
-    { label: "New recommendation" },
+    { label: "New complaint", href: "/l1/new-complaint" },
+    { label: "New recommendation", href: "/l1/new-recommendation" },
   ],
   l2: [
     { label: "Dashboard", href: "/l2/dashboard" },

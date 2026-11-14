@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # --- health checks: where the web app can be reached from the backend ---
     web_url: str = "http://localhost:3000"
 
+    # --- evidence files; a relative folder is inside backend/ ---
+    upload_dir: str = "uploads"
+
     # --- lockout and rate limiting ---
     max_failed_logins: int = 5
     lockout_minutes: int = 15
