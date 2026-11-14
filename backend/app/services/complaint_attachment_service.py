@@ -35,6 +35,19 @@ EXTENSIONS = {
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 
+def _matches_type(mime_type: str, content: bytes) -> bool:
+    """Whether the file's own bytes fit the type the browser claimed (the claim alone is not trusted)."""
+    if mime_type == "application/pdf":
+        return content.startswith(b"%PDF-")
+    if mime_type == "image/jpeg":
+        return content.startswith(b"\xff\xd8\xff")
+    if mime_type == "image/png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if mime_type == "image/webp":
+        return content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+    return b"\x00" not in content  # text and .eml are plain text: no NUL bytes
+
+
 def _storage_root() -> Path:
     return BACKEND_DIR / settings.upload_dir  # an absolute upload_dir is used as it is
 
@@ -69,6 +82,9 @@ def add_attachment(
         raise ComplaintError(422, "empty_file", "That file is empty.")
     if len(content) > MAX_BYTES:
         raise ComplaintError(413, "file_too_large", f"Files can be at most {MAX_BYTES // (1024 * 1024)} MB.")
+
+    if not _matches_type(mime_type, content):
+        raise ComplaintError(415, "file_type_mismatch", "That file's contents do not match its type.")
 
     stored = Path("complaints") / str(complaint.id) / f"{uuid4().hex}{extension}"
     target = _storage_root() / stored

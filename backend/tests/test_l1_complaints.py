@@ -463,9 +463,34 @@ def test_evidence_files_are_checked(client, lists):
     assert client.post(f"{URL}/999999/attachments", files={"file": ("a.pdf", b"x", "application/pdf")}).status_code == 404
 
 
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 8
+
+
+def test_evidence_contents_must_match_the_claimed_type(client, lists):
+    uri = f"{URL}/{new_draft(client, lists)['id']}/attachments"
+    for name, content, mime in [
+        ("fake.png", b"this is not an image", "image/png"),
+        ("fake.pdf", b"<html>not a pdf</html>", "application/pdf"),
+        ("fake.jpg", PNG, "image/jpeg"),
+        ("fake.webp", b"RIFF0000WAVE", "image/webp"),
+        ("fake.txt", b"binary\x00data", "text/plain"),
+    ]:
+        response = client.post(uri, files={"file": (name, content, mime)})
+        assert response.status_code == 415 and error_code(response) == "file_type_mismatch", name
+    for name, content, mime in [
+        ("ok.png", PNG, "image/png"),
+        ("ok.jpg", b"\xff\xd8\xff\xe0data", "image/jpeg"),
+        ("ok.webp", b"RIFF0000WEBPdata", "image/webp"),
+        ("ok.pdf", b"%PDF-1.7 data", "application/pdf"),
+        ("ok.txt", "plain text ස".encode(), "text/plain"),
+        ("ok.eml", b"From: a@b.lk\r\nSubject: hi\r\n\r\nbody", "message/rfc822"),
+    ]:
+        assert client.post(uri, files={"file": (name, content, mime)}).status_code == 201, name
+
+
 def test_a_complaint_holds_at_most_ten_files(client, lists):
     uri = f"{URL}/{new_draft(client, lists)['id']}/attachments"
     for _ in range(10):
-        assert client.post(uri, files={"file": ("a.png", b"x", "image/png")}).status_code == 201
+        assert client.post(uri, files={"file": ("a.png", PNG, "image/png")}).status_code == 201
     eleventh = client.post(uri, files={"file": ("a.png", b"x", "image/png")})
     assert eleventh.status_code == 409 and error_code(eleventh) == "too_many_files"
