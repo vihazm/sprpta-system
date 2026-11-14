@@ -4,25 +4,6 @@ import type { L1DashboardData } from "./types";
 // Replace this with a fetch when the API does.
 export const l1DashboardSample: L1DashboardData = {
   day: { entered: 7, forwarded: 5, stillOpen: 2, thisWeek: 38, thisMonth: 142 },
-  draft: {
-    name: "K. Wijesinghe",
-    contact: "077 123 4567",
-    received: "Today · 11 Nov 2026, 07:42",
-    medium: "SMS",
-    transport: "Bus",
-    vehicle: "NB-4521",
-    about: "Driver",
-    route: "Route 350 · Galle to Matara",
-    area: "Galle",
-    lookup: { permit: "P/GL/0231", owner: "K. Silva", pastComplaints: 3 },
-    subject: "Conductor was rude to an elderly passenger",
-    category: "Staff behaviour",
-    description:
-      "The complainant says the conductor shouted at an elderly woman at Galle stand for being slow to board, and refused to help with her bag.",
-    severity: "medium",
-    attachments: ["whatsapp-message.png · 240 kB", "voice-note.m4a · 1.1 MB"],
-    duplicate: { ref: "C-2026-00397", summary: "rude conductor, Route 350, 3 days ago", match: 88 },
-  },
   queues: [
     { kind: "portal", title: "Portal submissions", note: "Awaiting your check", count: 4 },
     { kind: "drafts", title: "Drafts", note: "Started, no reference yet", count: 3 },
