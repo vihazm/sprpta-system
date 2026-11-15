@@ -290,12 +290,12 @@ def test_a_trip_without_a_duty_record_is_unavailable_and_nobody_is_guessed(clien
     assert body["conductor"] == {"person_id": None, "name": None, "status": "unavailable"}
 
 
-def test_a_missing_conductor_leaves_the_record_unverified(client, world):
+def test_a_missing_conductor_does_not_make_a_verified_driver_unverified(client, world):
     trip = publish_trip(world, conductor_person_id=None)
     body = client.get(f"{LOOKUP}/trips/{trip['id']}").json()
     assert body["driver"]["status"] == "verified" and body["driver"]["name"] == "Saman Kumara"
-    assert body["conductor"] == {"person_id": None, "name": None, "status": "unavailable"}
-    assert body["verification_status"] == "Unverified"
+    assert body["conductor"] == {"person_id": None, "name": None, "status": "unavailable"}  # nobody is guessed
+    assert body["verification_status"] == "Verified"  # judged on the people the record names, here the driver
 
 
 def test_unverified_staff_are_never_named(client, db, world):
@@ -512,7 +512,7 @@ def test_missing_and_unverified_people_are_stored_as_such(client, db, world, com
     trip = publish_trip(world, conductor_person_id=None)
     duty = client.post(COMPLAINTS, json=complaint_body(trip["id"])).json()["duty"]
     assert (duty["owner_name"], duty["conductor_name"]) == (None, None)
-    assert duty["driver_name"] == "Saman Kumara" and duty["verification_status"] == "Unverified"
+    assert duty["driver_name"] == "Saman Kumara" and duty["verification_status"] == "Verified"
 
     unverified = publish_trip(world, departure_time="09:00")
     row = db.scalar(select(TripDuty).where(TripDuty.trip_id == unverified["id"]))
@@ -584,3 +584,24 @@ def test_simulated_records_are_marked_as_such(client, db, world):
     db.commit()
     assert search(client).json()["trips"][0]["synthetic"] is True
     assert client.get(f"{LOOKUP}/trips/{trip['id']}").json()["synthetic"] is True
+
+
+def test_the_owner_on_the_published_daily_record_is_shown_when_there_is_no_ownership_record(client, db, world):
+    other_owner = Person(full_name="Kamal Silva", person_type=PersonType.OWNER)
+    db.add(other_owner)
+    db.commit()
+    trip = publish_trip(world)
+    assert client.get(f"{LOOKUP}/trips/{trip['id']}").json()["owner"]["source"] == "vehicle_record"  # none on the record yet
+    db.get(DailyTrip, trip["id"]).owner_person_id = other_owner.id
+    db.commit()
+    owner = client.get(f"{LOOKUP}/trips/{trip['id']}").json()["owner"]
+    assert owner == {"person_id": other_owner.id, "name": "Kamal Silva", "source": "daily_record"}
+
+    # An approved ownership record for that date still comes first.
+    created = world.admin.post(
+        f"{ADMIN}/owner-assignments",
+        json={"vehicle_number": "ND-7782", "owner_person_id": world.owner.id, "valid_from": (DAY - timedelta(days=5)).isoformat()},
+    ).json()
+    assert world.admin.post(f"{ADMIN}/owner-assignments/{created['id']}/approve").status_code == 200
+    assert world.admin.post(f"{ADMIN}/owner-assignments/{created['id']}/publish").status_code == 200
+    assert client.get(f"{LOOKUP}/trips/{trip['id']}").json()["owner"]["source"] == "assignment"

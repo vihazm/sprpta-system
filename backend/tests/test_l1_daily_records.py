@@ -134,7 +134,7 @@ def test_my_daily_bus_records_lists_reopens_and_edits_only_my_pending_records(cl
                                                                driver_start=None, driver_end=None))
     assert changed.status_code == 200 and changed.json()["remarks"] == "Corrected"
     assert changed.json()["driver_name"] is None and changed.json()["conductor_name"] == "Chaminda Rathnayake"
-    clash = client.put(f"{RECORDS}/{first['id']}", json=body(world, departure_time="14:00"))
+    clash = client.put(f"{RECORDS}/{first['id']}", json=body(world, departure_time="14:00", end_time="16:00"))
     assert clash.status_code == 409 and error_code(clash) == "duplicate_trip"
     assert count(db, DailyTrip) == 2
     assert db.scalars(select(AuditLog).where(AuditLog.action == "trip.update")).all()
@@ -219,3 +219,32 @@ def test_entered_approved_published_searched_and_used_in_a_classified_complaint(
     assert mine_list["total"] == 1 and mine_list["items"][0]["accused_name"] == "Saman Kumara"
     assert client.get("/api/l1/dashboard").json()["by_target"]["driver"] == 1
 
+
+# ---------------------------------------------------------------- every answer is private, and times must make sense
+
+
+def test_every_daily_record_answer_is_no_store(client, db, world):
+    created = client.post(RECORDS, json=body(world))
+    saved = created.json()
+    assert created.headers["cache-control"] == "no-store"  # the answers name the people on duty
+    assert client.get(f"{RECORDS}/{saved['id']}").headers["cache-control"] == "no-store"
+    assert client.get(RECORDS).headers["cache-control"] == "no-store"
+    assert client.put(f"{RECORDS}/{saved['id']}", json=body(world, remarks="x")).headers["cache-control"] == "no-store"
+
+
+def test_an_end_time_must_be_after_its_start(client, db, world):
+    for patch in (
+        {"end_time": "06:30"},  # the trip ends when it starts
+        {"end_time": "06:00"},  # the trip ends before it starts
+        {"driver_start": "12:00", "driver_end": "08:00"},
+        {"conductor_start": "12:00", "conductor_end": "12:00"},
+    ):
+        refused = client.post(RECORDS, json=body(world, **patch))
+        assert refused.status_code == 422 and error_code(refused) == "time_order", patch
+    assert count(db, DailyTrip) == 0
+    saved = add(client, world)
+    refused = client.put(f"{RECORDS}/{saved['id']}", json=body(world, driver_start="13:00", driver_end="12:00"))
+    assert refused.status_code == 422 and error_code(refused) == "time_order"
+    # One time on its own, or none at all, is fine.
+    ok = client.put(f"{RECORDS}/{saved['id']}", json=body(world, end_time=None, driver_end=None, conductor_start=None))
+    assert ok.status_code == 200

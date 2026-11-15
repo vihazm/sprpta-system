@@ -94,6 +94,14 @@ def _checked(db: Session, data: DailyRecordIn):
         raise DutyRecordError(
             422, "duty_without_person", "Choose the conductor before entering the conductor's duty times."
         )
+    # Times are a time of day with no date, so an end must be later than its start on the same day.
+    for label, start, end in (
+        ("The trip", data.departure_time, data.end_time),
+        ("The driver's duty", data.driver_start, data.driver_end),
+        ("The conductor's duty", data.conductor_start, data.conductor_end),
+    ):
+        if start is not None and end is not None and end <= start:
+            raise DutyRecordError(422, "time_order", f"{label} must end after it starts.")
     return vehicle, permit, owner, driver, conductor
 
 

@@ -51,7 +51,7 @@ export type TripDetails = {
   tripStatus: TripStatus;
   direction: string | null;
   synthetic: boolean;
-  owner: { personId: number | null; name: string | null; source: "assignment" | "vehicle_record" | null };
+  owner: { personId: number | null; name: string | null; source: "assignment" | "daily_record" | "vehicle_record" | null };
   driver: DutyPerson;
   conductor: DutyPerson;
   verification: VerificationStatus;

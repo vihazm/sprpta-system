@@ -46,8 +46,8 @@ class DutyPerson(BaseModel):
 class RegisteredOwner(BaseModel):
     person_id: int | None
     name: str | None
-    # From an approved ownership record for that date, or from the vehicle record. Never both guessed.
-    source: Literal["assignment", "vehicle_record"] | None
+    # From an approved ownership record for that date, the published daily record, or the vehicle record. Never guessed.
+    source: Literal["assignment", "daily_record", "vehicle_record"] | None
 
 
 class TripDetails(BaseModel):

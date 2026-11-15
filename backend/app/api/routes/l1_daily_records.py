@@ -15,8 +15,14 @@ from app.services import l1_daily_record_service as records
 from app.services.auth_service import Principal
 from app.services.duty_record_service import DutyRecordError
 
+def _no_store(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store"  # every answer here names people on duty
+
+
 router = APIRouter(
-    prefix="/api/l1/daily-records", tags=["level 1"], dependencies=[Depends(require_roles("l1"))]
+    prefix="/api/l1/daily-records",
+    tags=["level 1"],
+    dependencies=[Depends(require_roles("l1")), Depends(_no_store)],
 )
 
 RecordId = Annotated[int, Path(ge=1, le=MAX_ID)]
@@ -28,7 +34,6 @@ def _fail(exc: DutyRecordError) -> HTTPException:
 
 @router.get("", response_model=DailyRecordList)
 def list_mine(
-    response: Response,
     service_date: date | None = None,
     search: Annotated[str | None, Query(max_length=40)] = None,
     status: DutyRecordStatus | None = None,
@@ -36,7 +41,6 @@ def list_mine(
     officer: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ) -> DailyRecordList:
-    response.headers["Cache-Control"] = "no-store"
     return records.list_mine(db, officer, service_date=service_date, search=search, status=status, page=page)
 
 

@@ -2,7 +2,8 @@
 
 Only published records are read. Who drove or conducted is shown only when Admin has verified the duty
 record; otherwise the answer is Unverified or Unavailable, never a guess. The registered owner comes from
-an approved ownership record that covers the date, else from the vehicle record.
+an approved ownership record that covers the date, else the owner on the published daily record, else the
+vehicle record.
 """
 
 from datetime import date, datetime
@@ -78,7 +79,26 @@ def search_trips(db: Session, service_date: date, bus_number: str) -> BusSearch:
     )
 
 
-def _owner(db: Session, vehicle: Vehicle, on: date) -> RegisteredOwner:
+def bus_status_on(db: Session, vehicle_id: int, day: date) -> tuple[str, str | None]:
+    """What the published records say about a bus on a date: (operated | cancelled | did_not_operate | no_record, reason)."""
+    statuses = db.scalars(
+        select(DailyTrip.trip_status).where(
+            DailyTrip.vehicle_id == vehicle_id,
+            DailyTrip.service_date == day,
+            DailyTrip.status == DutyRecordStatus.PUBLISHED,
+        )
+    ).all()
+    if statuses:
+        return ("cancelled" if all(s == "cancelled" for s in statuses) else "operated"), None
+    stopped = db.scalar(
+        select(BusNonOperation)
+        .where(BusNonOperation.vehicle_id == vehicle_id, BusNonOperation.start_date <= day, BusNonOperation.end_date >= day)
+        .order_by(BusNonOperation.id)
+    )
+    return ("did_not_operate", stopped.reason) if stopped else ("no_record", None)
+
+
+def _owner(db: Session, vehicle: Vehicle, on: date, trip: DailyTrip | None = None) -> RegisteredOwner:
     assignment = db.scalar(
         select(OwnerAssignment)
         .where(
@@ -92,6 +112,10 @@ def _owner(db: Session, vehicle: Vehicle, on: date) -> RegisteredOwner:
     if assignment is not None:
         person = db.get(Person, assignment.owner_person_id)
         return RegisteredOwner(person_id=person.id, name=person.full_name, source="assignment")
+    # The owner named on the published daily record of that trip comes next: Admin verified it when approving.
+    if trip is not None and trip.owner_person_id is not None:
+        person = db.get(Person, trip.owner_person_id)
+        return RegisteredOwner(person_id=person.id, name=person.full_name, source="daily_record")
     person = db.get(Person, vehicle.owner_person_id) if vehicle.owner_person_id else None
     if person is not None:
         return RegisteredOwner(person_id=person.id, name=person.full_name, source="vehicle_record")
@@ -121,9 +145,11 @@ def trip_details(db: Session, trip_id: int) -> TripDetails:
     driver = _on_duty(db, duty.driver_person_id if duty else None, duty)
     conductor = _on_duty(db, duty.conductor_person_id if duty else None, duty)
 
-    if duty is None:
+    # Judged on the people the record names: a missing conductor does not make a verified driver "Unverified".
+    named = [p.status for p in (driver, conductor) if p.status != "unavailable"]
+    if not named:
         verification = "Unavailable"
-    elif driver.status == "verified" and conductor.status == "verified":
+    elif all(status == "verified" for status in named):
         verification = "Verified"
     else:
         verification = "Unverified"
@@ -148,7 +174,7 @@ def trip_details(db: Session, trip_id: int) -> TripDetails:
         trip_status=trip.trip_status,
         direction=trip.direction,
         synthetic=trip.synthetic_batch_id is not None,
-        owner=_owner(db, vehicle, trip.service_date),
+        owner=_owner(db, vehicle, trip.service_date, trip),
         driver=driver,
         conductor=conductor,
         verification_status=verification,
