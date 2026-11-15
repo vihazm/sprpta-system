@@ -188,7 +188,9 @@ export function ComplaintsList({
       {notice && <Note tone="neutral">{notice}</Note>}
       {answer?.error && <Note tone="alert">{answer.error}</Note>}
 
-      <div className="overflow-x-auto">
+      {/* relative: a visually hidden label in the last column is absolutely positioned, and without this the
+          scroll box does not clip it, so the whole page scrolls sideways */}
+      <div className="relative overflow-x-auto">
         <table className="w-full border-separate border-spacing-y-1 text-[0.81rem]">
           <thead>
             <tr>
