@@ -10,6 +10,10 @@ from app.schemas.l1_complaints import VehicleLookup
 # Nobody on a record is ever guessed: a person is shown only when Admin has verified the duty record.
 PersonStatus = Literal["verified", "unverified", "unavailable"]
 VerificationStatus = Literal["Verified", "Unverified", "Unavailable"]
+# What the records say about the bus on the date: it ran, every trip was cancelled, it did not operate (with a
+# reason), or there is no record at all. Only the last is "no matching record".
+OperationStatus = Literal["operated", "cancelled", "did_not_operate", "no_record"]
+TripStatus = Literal["completed", "cancelled", "partial"]
 
 
 class TripSummary(BaseModel):
@@ -20,12 +24,17 @@ class TripSummary(BaseModel):
     permit_number: str
     route: str
     departure_time: time
+    trip_status: TripStatus = "completed"
+    direction: str | None = None
+    synthetic: bool = False  # simulated development data, not an official record
 
 
 class BusSearch(BaseModel):
     service_date: date
     vehicle: VehicleLookup
     trips: list[TripSummary]  # empty when no published record exists for that bus on that date
+    operation_status: OperationStatus = "no_record"
+    non_operation_reason: str | None = None  # why the bus did not operate
 
 
 class DutyPerson(BaseModel):
@@ -57,6 +66,12 @@ class TripDetails(BaseModel):
     origin: str
     destination: str
     departure_time: time
+    arrival_time: time | None = None
+    actual_departure: time | None = None
+    actual_arrival: time | None = None
+    trip_status: TripStatus = "completed"
+    direction: str | None = None
+    synthetic: bool = False
     owner: RegisteredOwner
     driver: DutyPerson
     conductor: DutyPerson

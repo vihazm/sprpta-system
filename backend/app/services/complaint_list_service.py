@@ -84,8 +84,16 @@ def list_complaints(
     officer_id: int,
     search: str,
     page: int,
+    category_id: int | None = None,
+    verification: str | None = None,
 ) -> ComplaintPage:
     base = []
+    if category_id is not None:
+        base.append(Complaint.category_id == category_id)
+    if verification == "failed":  # the bus could not be verified against the daily records
+        base.append(Complaint.bus_verification.in_(("not_found", "not_operated", "trip_cancelled", "unverified")))
+    elif verification == "non_operating":  # the bus did not operate, or the trip was cancelled
+        base.append(Complaint.bus_verification.in_(("not_operated", "trip_cancelled")))
     if scope == "mine":
         base.append(Complaint.entered_by_user_id == officer_id)  # only what this officer registered
     term = search.strip()
@@ -146,6 +154,8 @@ def list_complaints(
             updated_at=c.updated_at,
             editable=c.status in EDITABLE,
             possible_duplicate=dup and c.status in EDITABLE,
+            bus_verification=c.bus_verification,
+            synthetic=c.synthetic_batch_id is not None,
         )
         for c, area, severity, dup, t, category, person_name, snapshot in rows
     ]

@@ -6,6 +6,7 @@ import { Icon } from "@/components/dashboard/icons";
 import { muted } from "@/components/dashboard/ui";
 import { useDashboard } from "./DashboardData";
 import { ComplaintSources } from "./ComplaintSources";
+import { ComplaintAnalytics } from "./ComplaintAnalytics";
 import { ComplaintsByTarget } from "./ComplaintsByTarget";
 import { NeedsAttention } from "./NeedsAttention";
 import { PassedToLevel2 } from "./PassedToLevel2";
@@ -82,6 +83,7 @@ export function DashboardView({ name }: { name: string }) {
         </div>
 
         <ComplaintsByTarget counts={data?.byTarget} className="min-[1200px]:col-span-12" />
+        <ComplaintAnalytics className="min-[1200px]:col-span-12" />
 
         <RecommendationForm className="min-[1200px]:col-span-4" />
         <ComplaintSources

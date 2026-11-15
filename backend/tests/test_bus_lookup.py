@@ -216,6 +216,9 @@ def test_search_lists_the_published_trips_of_that_bus_on_that_date(client, world
         "permit_number": "002108",
         "route": "24/1 Avithtawa - Elpitiya",
         "departure_time": "06:30:00",
+        "trip_status": "completed",
+        "direction": None,
+        "synthetic": False,
     }
     assert body["service_date"] == DAY.isoformat()
     assert body["vehicle"]["area_name"] == "Galle" and body["vehicle"]["permit_number"] == "002108"
@@ -266,6 +269,12 @@ def test_the_selected_record_shows_everything_that_was_verified(client, world):
         "origin": "Avithtawa",
         "destination": "Elpitiya",
         "departure_time": "06:30:00",
+        "arrival_time": None,
+        "actual_departure": None,
+        "actual_arrival": None,
+        "trip_status": "completed",
+        "direction": None,
+        "synthetic": False,
         "owner": {"person_id": world.owner.id, "name": "Nimal Perera", "source": "vehicle_record"},
         "driver": {"person_id": world.driver.id, "name": "Saman Kumara", "status": "verified"},
         "conductor": {"person_id": world.conductor.id, "name": "Chaminda Rathnayake", "status": "verified"},
@@ -536,3 +545,42 @@ def test_the_trip_reference_is_for_level_one_only(client, db, world, complaint_l
     trip = publish_trip(world)
     assert world.admin.post(COMPLAINTS, json=complaint_body(trip["id"])).status_code == 403
     assert TestClient(app).post(COMPLAINTS, json=complaint_body(trip["id"])).status_code == 401
+
+# ---------------------------------------------------------------- what the lookup says when there is no trip
+
+
+def test_the_lookup_tells_a_bus_that_did_not_operate_from_one_with_no_record(client, db, world):
+    from app.models import BusNonOperation
+
+    db.add(BusNonOperation(vehicle_id=world.bus.id, start_date=DAY, end_date=DAY, reason="maintenance"))
+    db.commit()
+    stopped = search(client).json()
+    assert stopped["trips"] == [] and stopped["operation_status"] == "did_not_operate"
+    assert stopped["non_operation_reason"] == "maintenance"
+    nothing = search(client, on=DAY - timedelta(days=3)).json()
+    assert nothing["operation_status"] == "no_record" and nothing["non_operation_reason"] is None
+    assert search(client, bus="ZZ-0000").status_code == 404  # an invalid bus number
+
+
+def test_a_cancelled_trip_is_listed_as_cancelled_and_is_not_a_completed_one(client, db, world):
+    trip = publish_trip(world)
+    row = db.get(DailyTrip, trip["id"])
+    row.trip_status = "cancelled"
+    db.commit()
+    found = search(client).json()
+    assert found["operation_status"] == "cancelled"
+    assert [(t["id"], t["trip_status"]) for t in found["trips"]] == [(trip["id"], "cancelled")]
+    assert client.get(f"{LOOKUP}/trips/{trip['id']}").json()["trip_status"] == "cancelled"
+
+
+def test_simulated_records_are_marked_as_such(client, db, world):
+    from app.models import SyntheticBatch
+
+    batch = SyntheticBatch(name="t", scale="small", seed=1, config={})
+    db.add(batch)
+    db.flush()
+    trip = publish_trip(world)
+    db.get(DailyTrip, trip["id"]).synthetic_batch_id = batch.id
+    db.commit()
+    assert search(client).json()["trips"][0]["synthetic"] is True
+    assert client.get(f"{LOOKUP}/trips/{trip['id']}").json()["synthetic"] is True

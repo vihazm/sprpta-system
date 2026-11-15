@@ -35,6 +35,13 @@ function day(iso: string | null) {
   return `${d}/${m}/${y}`;
 }
 
+const VERIFICATION_LABEL: Record<string, string> = {
+  not_found: "Bus not found",
+  not_operated: "Bus did not operate",
+  trip_cancelled: "Trip cancelled",
+  unverified: "Not verified",
+};
+
 // What the mark beside an accused person means. Only the server decides it.
 const ACCUSED_NOTE: Record<string, string> = {
   verified_duty: "Verified on duty for this trip",
@@ -54,6 +61,9 @@ export function ComplaintsList({
   target = null,
   onTarget,
   scope = "mine",
+  categoryId = null,
+  verification = null,
+  onClearFilter,
   fixed = false,
   emptyText,
   notice,
@@ -65,6 +75,9 @@ export function ComplaintsList({
   target?: TargetFilter | null; // who the complaint is against
   onTarget?: (target: TargetFilter | null) => void;
   scope?: "mine" | "all"; // the officer's own complaints, or the whole Level 1 queue
+  categoryId?: number | null; // from a dashboard card: only this issue category
+  verification?: "failed" | "non_operating" | null; // from a dashboard card: bus verification problems
+  onClearFilter?: () => void;
   fixed?: boolean;
   emptyText: string;
   notice?: string;
@@ -73,7 +86,7 @@ export function ComplaintsList({
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [answer, setAnswer] = useState<{ key: string; page?: ComplaintPage; error?: string } | null>(null);
-  const key = `${filter}|${target}|${scope}|${search}|${page}`;
+  const key = `${filter}|${target}|${scope}|${categoryId}|${verification}|${search}|${page}`;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -85,14 +98,14 @@ export function ComplaintsList({
 
   useEffect(() => {
     let current = true;
-    void listComplaints({ status: filter, target, scope, search, page }).then((result) => {
+    void listComplaints({ status: filter, target, scope, categoryId, verification, search, page }).then((result) => {
       if (!current) return;
       setAnswer(result.ok ? { key, page: result.data } : { key, error: result.message });
     });
     return () => {
       current = false;
     };
-  }, [filter, target, scope, search, page, key]);
+  }, [filter, target, scope, categoryId, verification, search, page, key]);
 
   const loading = answer?.key !== key;
   const data = answer?.page;
@@ -159,6 +172,19 @@ export function ComplaintsList({
         />
       </label>
 
+      {(verification || categoryId) && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Chip tone="brand">
+            {verification === "failed"
+              ? "Bus could not be verified"
+              : verification === "non_operating"
+                ? "Bus did not operate on that date"
+                : `Issue category ${data?.rows[0]?.category ?? ""}`.trim()}
+          </Chip>
+          <PillButton onClick={onClearFilter}>Show all</PillButton>
+        </div>
+      )}
+
       {notice && <Note tone="neutral">{notice}</Note>}
       {answer?.error && <Note tone="alert">{answer.error}</Note>}
 
@@ -202,6 +228,11 @@ export function ComplaintsList({
                 <td>
                   <span className="inline-flex flex-wrap gap-1.5">
                     <Chip tone={STATUS_TONE[c.status]}>{c.status}</Chip>
+                    {c.busVerification && c.busVerification !== "verified" && c.busVerification !== "corrected" && (
+                      <Chip tone="warn">{VERIFICATION_LABEL[c.busVerification] ?? c.busVerification}</Chip>
+                    )}
+                    {c.busVerification === "corrected" && <Chip tone="info">Bus corrected</Chip>}
+                    {c.synthetic && <Chip tone="info">Simulated</Chip>}
                     {c.possibleDuplicate && <Chip tone="brand">Possible duplicate</Chip>}
                   </span>
                 </td>

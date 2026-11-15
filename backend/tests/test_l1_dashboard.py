@@ -270,7 +270,7 @@ def test_the_list_shows_only_what_level_one_may_see(client, db, world):
     assert set(sent) == {
         "id", "reference_number", "status", "subject", "vehicle_number", "complainant", "area_name", "severity_name",
         "complaint_date", "updated_at", "editable", "possible_duplicate", "target_code", "target_name", "accused_name",
-        "accused_status", "category_name",
+        "accused_status", "category_name", "bus_verification", "synthetic",
     }  # nothing of Level 2's review is here
     assert (sent["area_name"], sent["severity_name"], sent["editable"]) == ("Galle", "High", False)
     assert next(i for i in items if i["status"] == "draft")["editable"] is True

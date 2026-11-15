@@ -38,6 +38,8 @@ class ComplaintForm(BaseModel):
     # one is picked, must be of the right type for the target; whether they are verified is worked out by the
     # server, never taken from the request.
     target_type_id: Id | None = None
+    # Who is complaining, when known: a passenger, or someone with a role in the service.
+    complainant_type: Literal["passenger", "driver", "conductor", "owner", "other"] | None = None
     # Made once for each new complaint by the form. Sending a create again with the same key returns the complaint
     # that was already made, so a retry cannot leave two. Ignored when changing a saved complaint.
     client_request_id: Text | None = Field(default=None, min_length=8, max_length=64)
@@ -182,6 +184,10 @@ class ComplaintOut(BaseModel):
     category_id: int | None
     category_name: str | None
     target_type_id: int | None  # who the complaint is against
+    complainant_type: str | None
+    # What checking the bus against the daily records found: verified, corrected (the number given was wrong),
+    # unverified, not_found, not_operated or trip_cancelled. The number as typed stays in vehicle_number.
+    bus_verification: str | None
     target_code: str | None
     target_name: str | None
     accused_status: AccusedStatus

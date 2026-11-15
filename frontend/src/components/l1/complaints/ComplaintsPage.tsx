@@ -16,6 +16,10 @@ export function ComplaintsPage() {
   const filter = FILTERS.find((f) => f === params.get("status")) ?? null;
   const target = TARGETS.find((t) => t === params.get("target")) ?? null;
   const scope = params.get("scope") === "all" ? "all" : "mine";
+  const verification = params.get("verification") === "failed" || params.get("verification") === "non_operating"
+    ? (params.get("verification") as "failed" | "non_operating")
+    : null;
+  const categoryId = /^[1-9]\d{0,9}$/.test(params.get("category_id") ?? "") ? Number(params.get("category_id")) : null;
 
   function open(next: { status?: ComplaintFilter | null; target?: TargetFilter | null }) {
     const query = new URLSearchParams();
@@ -24,6 +28,8 @@ export function ComplaintsPage() {
     if (status) query.set("status", status);
     if (kind) query.set("target", kind);
     if (scope === "all") query.set("scope", "all");
+    if (verification) query.set("verification", verification);
+    if (categoryId) query.set("category_id", String(categoryId));
     router.replace(query.size ? `/l1/complaints?${query}` : "/l1/complaints");
   }
 
@@ -40,6 +46,9 @@ export function ComplaintsPage() {
       target={target}
       onTarget={(next) => open({ target: next })}
       scope={scope}
+      categoryId={categoryId}
+      verification={verification}
+      onClearFilter={() => router.replace("/l1/complaints")}
       emptyText="No complaints here yet."
     />
   );

@@ -48,8 +48,20 @@ export function RecordFields({ record }: { record: BusRecord }) {
       <Value label="Conductor on duty">
         <Person person={record.conductor} />
       </Value>
+      <Value label="Operation status">
+        {record.tripStatus === "cancelled" ? (
+          <Chip tone="warn">Cancelled</Chip>
+        ) : record.tripStatus === "partial" ? (
+          <Chip tone="warn">Stopped early</Chip>
+        ) : (
+          <Chip tone="ok">Completed</Chip>
+        )}
+      </Value>
       <Value label="Verification status">
         <Chip tone={STATUS_TONE[record.verification]}>{record.verification}</Chip>
+      </Value>
+      <Value label="Record source">
+        {record.synthetic ? <Chip tone="info">Simulated test data, not an official record</Chip> : "Published daily record"}
       </Value>
     </div>
   );
@@ -79,6 +91,8 @@ export function recordSummary(r: BusRecord) {
     `Registered owner: ${r.owner ?? "Unavailable"}`,
     `Driver on duty: ${staffText(r.driver)}`,
     `Conductor on duty: ${staffText(r.conductor)}`,
+    `Operation status: ${r.tripStatus === "cancelled" ? "Cancelled" : r.tripStatus === "partial" ? "Stopped early" : "Completed"}`,
     `Verification status: ${r.verification}`,
+    `Record source: ${r.synthetic ? "Simulated test data, not an official record" : "Published daily record"}`,
   ].join("\n");
 }

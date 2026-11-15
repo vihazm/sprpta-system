@@ -86,6 +86,46 @@ export async function findReference(reference: string): Promise<ApiResult<Refere
   }));
 }
 
+export type CountRow = { id: number | null; name: string; count: number };
+
+// Complaints by category, route, district and month, from PostgreSQL aggregates over this officer's own complaints.
+export type Analytics = {
+  total: number;
+  byCategory: CountRow[];
+  byRoute: CountRow[];
+  byDistrict: CountRow[];
+  byMonth: { month: string; count: number }[];
+  duplicates: number;
+  incomplete: number;
+  failedVerification: number;
+  nonOperating: number;
+};
+
+export async function loadAnalytics(): Promise<ApiResult<Analytics>> {
+  const result = await api<{
+    total: number;
+    by_category: CountRow[];
+    by_route: CountRow[];
+    by_district: CountRow[];
+    by_month: { month: string; count: number }[];
+    duplicates: number;
+    incomplete: number;
+    failed_verification: number;
+    non_operating: number;
+  }>("/api/l1/dashboard/analytics");
+  return mapData(result, (b) => ({
+    total: b.total,
+    byCategory: b.by_category,
+    byRoute: b.by_route,
+    byDistrict: b.by_district,
+    byMonth: b.by_month,
+    duplicates: b.duplicates,
+    incomplete: b.incomplete,
+    failedVerification: b.failed_verification,
+    nonOperating: b.non_operating,
+  }));
+}
+
 export type ComplaintFilter = "draft" | "incomplete" | "submitted" | "forwarded" | "rejected" | "duplicates";
 
 export type ComplaintRow = {
@@ -106,6 +146,8 @@ export type ComplaintRow = {
   updated: string;
   editable: boolean;
   possibleDuplicate: boolean;
+  busVerification: string | null; // what checking the bus against the daily records found
+  synthetic: boolean; // simulated development data
 };
 
 export type ComplaintPage = {
@@ -121,11 +163,15 @@ export async function listComplaints(filters: {
   status: ComplaintFilter | null;
   target: TargetFilter | null;
   scope: "mine" | "all";
+  categoryId?: number | null;
+  verification?: "failed" | "non_operating" | null;
   search: string;
   page: number;
 }): Promise<ApiResult<ComplaintPage>> {
   const params = new URLSearchParams({ page: String(filters.page), scope: filters.scope });
   if (filters.target) params.set("target", filters.target);
+  if (filters.categoryId) params.set("category_id", String(filters.categoryId));
+  if (filters.verification) params.set("verification", filters.verification);
   if (filters.status) params.set("status", filters.status);
   if (filters.search) params.set("search", filters.search);
   const result = await api<{
@@ -147,6 +193,8 @@ export async function listComplaints(filters: {
       updated_at: string;
       editable: boolean;
       possible_duplicate: boolean;
+      bus_verification: string | null;
+      synthetic: boolean;
     }[];
     total: number;
     page: number;
@@ -173,6 +221,8 @@ export async function listComplaints(filters: {
       updated: c.updated_at,
       editable: c.editable,
       possibleDuplicate: c.possible_duplicate,
+      busVerification: c.bus_verification,
+      synthetic: c.synthetic,
     })),
     total: b.total,
     page: b.page,

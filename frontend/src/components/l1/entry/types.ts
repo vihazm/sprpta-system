@@ -20,6 +20,7 @@ export type FormOptions = {
   routes: RouteOption[];
 };
 
+export type ComplainantType = "passenger" | "driver" | "conductor" | "owner" | "other";
 export type PersonType = "driver" | "conductor" | "sprpta_staff" | "owner";
 export type PersonRecord = { id: number; name: string; type: PersonType };
 
@@ -49,6 +50,8 @@ export type BusRecord = {
   departure: string; // HH:MM
   owner: string | null;
   ownerId: number | null;
+  tripStatus?: "completed" | "cancelled" | "partial"; // how the trip went (a cancelled trip never ran)
+  synthetic?: boolean; // simulated development data, not an official record
   driver: DutyPerson;
   conductor: DutyPerson;
   verification: "Verified" | "Unverified" | "Unavailable";
@@ -66,6 +69,7 @@ export type ComplaintFields = {
   tripId: number | null; // the daily record chosen in the lookup; the permit, owner and route come from it
   incidentTime: string; // HH:MM, only when it differs from the trip time
   incidentLocation: string;
+  complainantType: ComplainantType | null;
   targetId: number | null; // who the complaint is against (driver, conductor, owner, bus or service, other)
   personId: number | null; // the accused person, when a record matches and the officer confirmed it
   personName: string;
@@ -93,6 +97,7 @@ export type SavedComplaint = {
   targetName: string | null;
   accusedStatus: AccusedStatus;
   categoryName: string | null;
+  busVerification: string | null; // what checking the bus against the daily records found
   area: string | null;
   officer: string | null; // the Level 2 officer it was forwarded to
   attachments: Attachment[];

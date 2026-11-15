@@ -2,6 +2,7 @@ import { api, type ApiResult } from "@/lib/api-client";
 import type {
   AccusedStatus,
   Attachment,
+  ComplainantType,
   BusRecord,
   ComplaintFields,
   ComplaintStatus,
@@ -99,6 +100,8 @@ type ApiComplaint = {
   subject_person_name: string | null;
   target_type_id: number | null;
   target_name: string | null;
+  complainant_type: ComplainantType | null;
+  bus_verification: string | null;
   accused_status: AccusedStatus;
   category_name: string | null;
   route_stand_id: number | null;
@@ -151,6 +154,7 @@ function toComplaint(c: ApiComplaint): SavedComplaint {
       tripId: c.trip_id,
       incidentTime: c.incident_time?.slice(0, 5) ?? "",
       incidentLocation: c.incident_location ?? "",
+      complainantType: c.complainant_type,
       targetId: c.target_type_id,
       personId: c.subject_person_id,
       personName: c.subject_person_name ?? "",
@@ -165,6 +169,7 @@ function toComplaint(c: ApiComplaint): SavedComplaint {
     targetName: c.target_name,
     accusedStatus: c.accused_status,
     categoryName: c.category_name,
+    busVerification: c.bus_verification,
     area: c.area_name,
     officer: c.assigned_l2_name,
     attachments: c.attachments.map(toAttachment),
@@ -188,6 +193,7 @@ function toBody(f: ComplaintFields) {
     vehicle_number: blankToNull(f.vehicleNumber),
     trip_id: f.tripId,
     target_type_id: f.targetId,
+    complainant_type: f.complainantType,
     subject_person_id: f.personId,
     subject_person_text: f.personId === null ? blankToNull(f.personName) : null,
     route_stand_id: f.routeId,

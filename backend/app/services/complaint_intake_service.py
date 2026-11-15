@@ -123,6 +123,8 @@ def _out(db: Session, complaint: Complaint) -> ComplaintOut:
         category_id=complaint.category_id,
         category_name=db.scalar(select(ComplaintCategory.name).where(ComplaintCategory.id == complaint.category_id)),
         target_type_id=complaint.target_type_id,
+        complainant_type=complaint.complainant_type,
+        bus_verification=complaint.bus_verification,
         target_code=target.code if target else None,
         target_name=target.name if target else None,
         accused_status=accused_status(complaint, target, snapshot),
@@ -294,6 +296,7 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
     complaint.subject_person_text = _clean(data.subject_person_text)
     complaint.category_id = data.category_id
     complaint.target_type_id = target.id if target else None
+    complaint.complainant_type = data.complainant_type
     complaint.severity_id = data.severity_id
     complaint.subject = _clean(data.subject)
     complaint.description = _clean(data.description)
@@ -309,6 +312,7 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
             )
         vehicle = lookup.find_vehicle(db, number) if number else None
         permit = lookup.active_permit(db, vehicle) if vehicle else None
+        complaint.bus_verification = "unverified" if vehicle else ("not_found" if number else None)
         complaint.complaint_date = data.complaint_date
         complaint.route_stand_id = data.route_stand_id
         complaint.permit_id = permit.id if permit else None
@@ -324,7 +328,12 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
         typed = lookup.find_vehicle(db, number) if number else None
         if typed is not None and typed.id != vehicle.id:
             raise ComplaintError(422, "trip_mismatch", "The selected bus record is for another bus. Choose the bus again.")
+        reported = number  # what the officer typed stays as the reported number if it was not this bus
         number = vehicle.vehicle_number
+        corrected = bool(reported) and reported.strip().upper() != number.upper()
+        if corrected:
+            number = reported
+        complaint.bus_verification = "corrected" if corrected else "verified"
         complaint.complaint_date = trip.service_date
         complaint.route_stand_id = trip.route_stand_id
         complaint.permit_id = trip.permit_id

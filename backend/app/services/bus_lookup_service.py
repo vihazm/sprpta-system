@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.enums import DutyRecordStatus
 from app.core.timezone import LOCAL
-from app.models import Area, DailyTrip, OwnerAssignment, Permit, Person, RouteStand, TripDuty, Vehicle
+from app.models import Area, BusNonOperation, DailyTrip, OwnerAssignment, Permit, Person, RouteStand, TripDuty, Vehicle
 from app.schemas.l1_bus_lookup import (
     BusSearch,
     DutyPerson,
@@ -45,6 +45,18 @@ def search_trips(db: Session, service_date: date, bus_number: str) -> BusSearch:
         )
         .order_by(DailyTrip.departure_time, DailyTrip.id)
     ).all()
+    status, reason = "operated", None
+    if not rows:
+        stopped = db.scalar(
+            select(BusNonOperation).where(
+                BusNonOperation.vehicle_id == vehicle.id,
+                BusNonOperation.start_date <= service_date,
+                BusNonOperation.end_date >= service_date,
+            ).order_by(BusNonOperation.id)
+        )
+        status, reason = ("did_not_operate", stopped.reason) if stopped else ("no_record", None)
+    elif all(trip.trip_status == "cancelled" for trip, _p, _r in rows):
+        status = "cancelled"
     return BusSearch(
         service_date=service_date,
         vehicle=lookup.vehicle_lookup(db, vehicle),
@@ -55,9 +67,14 @@ def search_trips(db: Session, service_date: date, bus_number: str) -> BusSearch:
                 permit_number=permit_number,
                 route=route,
                 departure_time=trip.departure_time,
+                trip_status=trip.trip_status,
+                direction=trip.direction,
+                synthetic=trip.synthetic_batch_id is not None,
             )
             for trip, permit_number, route in rows
         ],
+        operation_status=status,
+        non_operation_reason=reason,
     )
 
 
@@ -125,6 +142,12 @@ def trip_details(db: Session, trip_id: int) -> TripDetails:
         origin=trip.origin,
         destination=trip.destination,
         departure_time=trip.departure_time,
+        arrival_time=trip.end_time,
+        actual_departure=trip.actual_departure,
+        actual_arrival=trip.actual_arrival,
+        trip_status=trip.trip_status,
+        direction=trip.direction,
+        synthetic=trip.synthetic_batch_id is not None,
         owner=_owner(db, vehicle, trip.service_date),
         driver=driver,
         conductor=conductor,

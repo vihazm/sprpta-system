@@ -88,6 +88,8 @@ class ComplaintRow(BaseModel):
     updated_at: datetime
     editable: bool  # a draft or an incomplete case can be opened and finished
     possible_duplicate: bool
+    bus_verification: str | None = None
+    synthetic: bool = False  # simulated development data
 
 
 class ComplaintPage(BaseModel):

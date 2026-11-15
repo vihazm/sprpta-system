@@ -42,6 +42,13 @@ import type {
 } from "./types";
 
 const TRANSPORT = ["Bus", "Trishaw"].map((value) => ({ value }));
+const COMPLAINANT_TYPES = [
+  { label: "Passenger", type: "passenger" },
+  { label: "Driver", type: "driver" },
+  { label: "Conductor", type: "conductor" },
+  { label: "Owner", type: "owner" },
+  { label: "Other", type: "other" },
+] as const;
 const REQUIRED_FIELDS = 10;
 
 // Evidence the backend accepts, with the size limit of each kind (checked again on the server).
@@ -62,6 +69,7 @@ const blank: ComplaintFields = {
   tripId: null,
   incidentTime: "",
   incidentLocation: "",
+  complainantType: null,
   targetId: null,
   personId: null,
   personName: "",
@@ -743,6 +751,14 @@ export function ComplaintForm({
           )}
         </Field>
       </div>
+      <Field label="Complainant type">
+        <ChoiceGroup
+          label="Complainant type"
+          choices={COMPLAINANT_TYPES.map((c) => ({ value: c.label }))}
+          defaultValue={COMPLAINANT_TYPES.find((c) => c.type === values.complainantType)?.label ?? ""}
+          onChange={([label]) => set("complainantType", COMPLAINANT_TYPES.find((c) => c.label === label)?.type ?? null)}
+        />
+      </Field>
       <Field label="Complaint medium *">
         <ChoiceGroup
           label="Medium"

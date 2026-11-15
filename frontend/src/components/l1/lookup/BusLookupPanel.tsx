@@ -10,6 +10,23 @@ import { formatDay } from "./format";
 import { SelectedRecord } from "./SelectedRecord";
 import type { BusSearch, TripDetails } from "./types";
 
+const REASONS: Record<string, string> = {
+  maintenance: "scheduled maintenance",
+  breakdown: "a mechanical breakdown",
+  driver_unavailable: "the driver was unavailable",
+  conductor_unavailable: "the conductor was unavailable",
+  permit_suspension: "a permit-related suspension",
+  service_cancellation: "the service was cancelled",
+  rest_day: "a planned rest day",
+  other: "another operational reason",
+};
+
+const TRIP_STATUS = {
+  completed: { label: "Completed", tone: "ok" },
+  cancelled: { label: "Cancelled", tone: "warn" },
+  partial: { label: "Stopped early", tone: "warn" },
+} as const;
+
 const th = "px-2.5 py-1 text-left text-[0.69rem] font-bold uppercase tracking-[0.07em] text-muted";
 
 function today() {
@@ -65,7 +82,9 @@ export function BusLookupPanel({
     setError(null);
     setSelected(found.data);
     const trip = found.data;
-    if (trip.verification === "Verified") {
+    if (trip.tripStatus === "cancelled") {
+      notify.error("This trip was cancelled", `${trip.busNumber}, trip at ${trip.departure}, did not run. Check that the complaint is about the right trip.`);
+    } else if (trip.verification === "Verified") {
       notify.success(title, `${trip.busNumber}, trip at ${trip.departure}. The duty details are verified.`);
     } else {
       // Missing or unverified duty information is a problem to see, so it uses the error popup.
@@ -92,8 +111,13 @@ export function BusLookupPanel({
     }
     setResult(found.data);
     const trips = found.data.trips;
-    if (trips.length === 0) {
+    if (trips.length === 0 && found.data.operationStatus === "did_not_operate") {
+      const why = REASONS[found.data.nonOperationReason ?? "other"] ?? "an operational reason";
+      notify.error("Bus did not operate", `${found.data.vehicle.number} did not operate on ${formatDay(found.data.date)}: ${why}.`);
+    } else if (trips.length === 0) {
       notify.error("No matching bus records", `${found.data.vehicle.number} has no published record for ${formatDay(found.data.date)}.`);
+    } else if (found.data.operationStatus === "cancelled") {
+      notify.error("Cancelled trips only", `Every trip of ${found.data.vehicle.number} on ${formatDay(found.data.date)} was cancelled.`);
     } else if (trips.length === 1) {
       void choose(trips[0].id, "Bus found"); // nothing to choose between
     } else {
@@ -135,7 +159,15 @@ export function BusLookupPanel({
 
       {error && <Note tone="alert">{error}</Note>}
 
-      {result && result.trips.length === 0 && (
+      {result && result.trips.length === 0 && result.operationStatus === "did_not_operate" && (
+        <Note tone="alert">
+          {result.vehicle.number} did not operate on {formatDay(result.date)}:{" "}
+          {REASONS[result.nonOperationReason ?? "other"] ?? "an operational reason"}. If the complainant gave this date,
+          check it with them. The complaint can be saved as incomplete until the date or the bus is confirmed.
+        </Note>
+      )}
+
+      {result && result.trips.length === 0 && result.operationStatus !== "did_not_operate" && (
         <Note tone="neutral">
           There is no published record for {result.vehicle.number} on {formatDay(result.date)}, so who drove, who
           conducted and the trip are Unavailable. Nothing is guessed. Permit {result.vehicle.permit ?? "not on record"},
@@ -153,6 +185,7 @@ export function BusLookupPanel({
                 <th className={th}>Permit number</th>
                 <th className={th}>Route</th>
                 <th className={th}>Departure / trip time</th>
+                <th className={th}>Operation status</th>
                 <th className={th}>
                   <span className="sr-only">Selection</span>
                 </th>
@@ -168,10 +201,20 @@ export function BusLookupPanel({
                       chosen ? "*:bg-crimson/10" : "*:bg-[#faf6f7]"
                     }`}
                   >
-                    <td className="font-bold">{trip.busNumber}</td>
+                    <td className="font-bold">
+                      {trip.busNumber}
+                      {trip.synthetic && (
+                        <span className="ml-2 align-middle">
+                          <Chip tone="info">Simulated</Chip>
+                        </span>
+                      )}
+                    </td>
                     <td className="tabular-nums">{trip.permitNumber}</td>
                     <td>{trip.route}</td>
                     <td className="font-bold tabular-nums">{trip.departure}</td>
+                    <td>
+                      <Chip tone={TRIP_STATUS[trip.tripStatus].tone}>{TRIP_STATUS[trip.tripStatus].label}</Chip>
+                    </td>
                     <td>
                       <div className="flex justify-end">
                         {chosen ? (

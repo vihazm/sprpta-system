@@ -1,6 +1,6 @@
 """The Level 1 complaint form: /api/l1/complaints (office staff only)."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Query, Response, UploadFile
 from sqlalchemy.orm import Session
@@ -104,13 +104,16 @@ def list_complaints(
     status: ListFilter | None = None,
     target: TargetFilter | None = None,
     scope: Scope = "mine",
+    category_id: int | None = Query(None, ge=1),
+    verification: Literal["failed", "non_operating"] | None = None,
     search: Annotated[str, NoNul, Query(max_length=100)] = "",
     page: int = Query(1, ge=1),
     officer: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ) -> ComplaintPage:
     return lists.list_complaints(
-        db, status=status, target=target, scope=scope, officer_id=officer.id, search=search, page=page
+        db, status=status, target=target, scope=scope, officer_id=officer.id, search=search, page=page,
+        category_id=category_id, verification=verification,
     )
 
 
