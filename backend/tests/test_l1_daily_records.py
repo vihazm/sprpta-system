@@ -240,8 +240,12 @@ def test_the_history_script_is_deterministic_repeatable_labelled_and_removable(c
     assert [(t.day, t.bus, t.slot, t.status) for t in first] == [(t.day, t.bus, t.slot, t.status) for t in seed.plan_trips()]
     seed.create(db, first, seed.plan_complaints(first))
     trips = db.scalar(select(func.count()).select_from(DailyTrip).join(Vehicle, Vehicle.id == DailyTrip.vehicle_id)
-                      .where(Vehicle.vehicle_number.like("SYN-%")))
+                      .where(Vehicle.vehicle_number.like("SP SY-%")))
     assert trips == len(first)
+    everything = db.scalar(select(func.count()).select_from(DailyTrip))
+    assert everything > len(first)  # the other buses in the database got test trips too
+    other = db.scalars(select(DailyTrip).join(Vehicle, Vehicle.id == DailyTrip.vehicle_id).where(Vehicle.vehicle_number == "ND-7782")).all()
+    assert other and all(x.remarks == "Synthetic test data" for x in other)
     statuses = {t.status.value for t in db.scalars(select(DailyTrip).where(DailyTrip.remarks == "Synthetic test data"))}
     assert statuses >= {"published"}
     assert all(p.team_label == "SYNTHETIC-TEST-DATA" for p in db.scalars(select(Person).where(Person.full_name.like("Synthetic %"))))
@@ -249,13 +253,13 @@ def test_the_history_script_is_deterministic_repeatable_labelled_and_removable(c
     assert syn and all(c.subject.startswith("[SYNTHETIC]") for c in syn)
 
     seed.create(db, first, seed.plan_complaints(first))  # a second run adds nothing
-    assert db.scalar(select(func.count()).select_from(DailyTrip)) == len(first)
+    assert db.scalar(select(func.count()).select_from(DailyTrip)) == everything
     assert len(db.scalars(select(Complaint).where(Complaint.client_request_id.like("syn-hist-%"))).all()) == len(syn)
 
     published = next(t for t in first if t.status == "published")
-    found = search(client, bus=f"SYN-{published.bus + 1:04d}", on=published.day).json()["trips"]
+    found = search(client, bus=f"SP SY-{published.bus + 1:04d}", on=published.day).json()["trips"]
     assert found  # the lookup finds the synthetic published trips
 
     seed.remove(db)
     assert db.scalar(select(func.count()).select_from(DailyTrip)) == 0
-    assert db.scalars(select(Vehicle).where(Vehicle.vehicle_number.like("SYN-%"))).all() == []
+    assert db.scalars(select(Vehicle).where(Vehicle.vehicle_number.like("SP SY-%"))).all() == []
