@@ -275,7 +275,12 @@ def generate(network: Network, world: World, cfg: Config, categories: list[str],
     for t in world.trips:
         if t.status != "cancelled":
             operated_days[t.bus_id].add(t.day)
-    for _ in range(n_nonop):
+    made_nonop = len(out)
+    attempts = 0
+    # A draw that cannot be placed (a date outside the window, a day the bus did run) is skipped and drawn again, so the
+    # planned number is really made.
+    while len(out) - made_nonop < n_nonop and attempts < n_nonop * 50:
+        attempts += 1
         roll = rng.random()
         if cancelled and roll < 0.30:
             i = rng.choice(cancelled)

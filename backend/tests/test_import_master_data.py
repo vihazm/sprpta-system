@@ -133,6 +133,7 @@ def test_running_the_import_again_adds_nothing(db, areas, workbook):
     assert {m: count(db, m) for m in (Vehicle, Permit, RouteStand, Person)} == before
     assert sum(again.created.values()) == 0
     assert again.existing["permits"] == 4 and again.existing["conductors"] == 4
+    assert again.existing["routes"] == 4  # each route already stored is counted once
 
 
 def test_vehicles_already_in_the_database_are_kept_not_duplicated(db, areas, workbook):

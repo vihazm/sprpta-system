@@ -135,6 +135,8 @@ def import_permits(db: Session, rows: list[list[str]], report: Report) -> None:
     seen: set[str] = set()  # permit numbers met so far in this file
     places = {(p.name, p.area_id): p.id for p in db.scalars(select(RouteStand).where(RouteStand.kind == PlaceKind.ROUTE))}
     stored_permits = {p.permit_number: p for p in db.scalars(select(Permit))}
+    routes_before = set(places)  # routes stored before this run: counted once each as "already there"
+    counted: set[tuple[str, int]] = set()
 
     for line, (permit_no, bus, office, route, origin, destination) in enumerate(rows, start=2):
         area_id = areas.get(office.upper())
@@ -149,6 +151,9 @@ def import_permits(db: Session, rows: list[list[str]], report: Report) -> None:
             places[(name, area_id)] = stand.id
             report.created["routes"] += 1
         route_id = places[(name, area_id)]
+        if (name, area_id) in routes_before and (name, area_id) not in counted:
+            counted.add((name, area_id))
+            report.existing["routes"] += 1
 
         number = _vehicle_number(bus)
         if not number:

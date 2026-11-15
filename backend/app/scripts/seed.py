@@ -86,6 +86,8 @@ DEV_VEHICLES = [
     ("Galle", "SP QA-1234", VehicleType.TRISHAW, "Sunil Jayasinghe", "GL-TP-0207", "Galle Fort stand"),
     ("Matara", "SP NC-4521", VehicleType.BUS, "Kamal Silva", "MT-BP-0112", "Matara - Colombo (route 2)"),
     ("Hambantota", "SP ND-7788", VehicleType.BUS, "Ruwan Fernando", "HB-BP-0123", "Hambantota - Tangalle (route 31)"),
+    # The bus the sample trips and sample complaints use; the client's workbook has it too, and then it is matched.
+    ("Galle", "ND-7782", VehicleType.BUS, "Piyal Gunasekara", "GL-BP-0102", "24/1 Avithtawa - Elpitiya"),
 ]
 DEV_PEOPLE = [
     # (name, type)
@@ -125,9 +127,16 @@ def _seed_complaint_lookups(db: Session, areas: dict[str, int]) -> None:
             db, Vehicle, {"vehicle_number": number},
             vehicle_type=vehicle_type, registered_area_id=areas[area], owner_person_id=owner.id,
         )
-        _get_or_create(db, Permit, {"permit_number": permit_number}, vehicle_id=vehicle.id, holder_person_id=owner.id)
         kind = PlaceKind.STAND if "stand" in place else PlaceKind.ROUTE
-        _get_or_create(db, RouteStand, {"kind": kind, "name": place, "area_id": areas[area]})
+        route = _get_or_create(db, RouteStand, {"kind": kind, "name": place, "area_id": areas[area]})
+        # The permit records its route (as the client's workbook import does), so the synthetic generator can run on
+        # these demo buses alone.
+        permit = _get_or_create(
+            db, Permit, {"permit_number": permit_number},
+            vehicle_id=vehicle.id, holder_person_id=owner.id, route_stand_id=route.id,
+        )
+        if permit.route_stand_id is None:
+            permit.route_stand_id = route.id
 
 
 # DEVELOPMENT ONLY: published daily records for the Bus & Permit Lookup, for yesterday and today.

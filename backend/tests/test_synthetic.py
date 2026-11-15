@@ -252,3 +252,9 @@ def test_the_writer_refuses_to_run_outside_a_local_development_database(network_
     monkeypatch.setattr(settings, "database_url", "postgresql+psycopg://u:p@db.example.com:5432/x")
     with pytest.raises(SystemExit):
         writer.seed(network_db, plan, log=lambda *_a: None)
+
+
+def test_the_plan_makes_at_least_the_configured_number_of_complaints(network_db):
+    for minimum in (150, 300):
+        cfg, plan = plan_for(network_db, scales={"small": {"days": 40, "min_complaints": minimum, "routes_per_tier_per_office": 1}})
+        assert len(plan.complaints) >= minimum, (minimum, len(plan.complaints))
