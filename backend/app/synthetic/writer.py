@@ -38,6 +38,7 @@ from app.models import (
     User,
     Vehicle,
 )
+from app.scripts.seed_dev_complaints import check_environment
 from app.synthetic.pipeline import Plan
 
 SYNTHETIC_PASSWORD = "synthetic-dev-only"  # the fictional officers exist only in development databases
@@ -118,6 +119,7 @@ def _people(db: Session, plan: Plan, batch: SyntheticBatch) -> tuple[dict[int, i
 
 
 def seed(db: Session, plan: Plan, log=print) -> dict:
+    check_environment()  # development databases on this computer only, whoever calls this
     area_ids = {a.name: a.id for a in db.scalars(select(Area))}
     batch = get_batch(db, plan)
     officers, level2, admin_id = _ensure_users(db, plan, area_ids)
@@ -367,6 +369,7 @@ def _finish_batch(db, pending, ids, batch, officers, owner_ids, driver_ids, cond
 
 def cleanup(db: Session, batch_name: str, log=print) -> dict:
     """Delete exactly what a batch created, nothing else."""
+    check_environment()
     batch = db.scalar(select(SyntheticBatch).where(SyntheticBatch.name == batch_name))
     if batch is None:
         log("  no such batch")

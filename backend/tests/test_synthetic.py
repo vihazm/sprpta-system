@@ -236,3 +236,19 @@ def test_dashboard_analytics_come_from_the_database_and_match_it(network_db, cli
     assert by_category["total"] == category["count"]
     assert client.get("/api/l1/dashboard/analytics").status_code == 200
     assert TestClient(app).get("/api/l1/dashboard/analytics").status_code == 401
+
+
+def test_the_writer_refuses_to_run_outside_a_local_development_database(network_db, monkeypatch):
+    from app.core.config import settings
+
+    cfg, plan = plan_for(network_db)
+    monkeypatch.setattr(settings, "app_env", "production")
+    with pytest.raises(SystemExit):
+        writer.seed(network_db, plan, log=lambda *_a: None)
+    with pytest.raises(SystemExit):
+        writer.cleanup(network_db, cfg.batch_name, log=lambda *_a: None)
+    assert network_db.scalar(select(func.count()).select_from(DailyTrip)) == 0  # nothing was written
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "database_url", "postgresql+psycopg://u:p@db.example.com:5432/x")
+    with pytest.raises(SystemExit):
+        writer.seed(network_db, plan, log=lambda *_a: None)
