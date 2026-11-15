@@ -1,11 +1,13 @@
 """What the complaint form looks things up in (UC-L1-02, UC-L1-03): lists, records and possible duplicates."""
 
+from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.enums import PersonType
+from app.core.timezone import LOCAL
 from app.models import (
     Area,
     Complaint,
@@ -33,6 +35,10 @@ from app.schemas.l1_complaints import (
 )
 
 MAX_DUPLICATES = 5
+# Only cases registered in this many days count as possible duplicates of a new complaint on the same bus.
+DUPLICATE_WINDOW_DAYS = 30
+# A possible duplicate matching at least this much has to be decided before forwarding. Weaker ones are still shown.
+MUST_DECIDE_MATCH = 40
 
 
 def form_options(db: Session) -> FormOptions:
@@ -92,6 +98,16 @@ def active_permit(db: Session, vehicle: Vehicle) -> Permit | None:
     return db.scalar(select(Permit).where(Permit.vehicle_id == vehicle.id, Permit.is_active).order_by(Permit.id))
 
 
+def find_permit_vehicle(db: Session, number: str) -> Vehicle | None:
+    """The active vehicle holding the permit with this number (spaces and case ignored), or None."""
+    wanted = "".join(number.split()).upper()
+    permit = db.scalar(
+        select(Permit).where(func.upper(func.replace(Permit.permit_number, " ", "")) == wanted, Permit.is_active)
+    )
+    vehicle = db.get(Vehicle, permit.vehicle_id) if permit else None
+    return vehicle if vehicle is not None and vehicle.is_active else None
+
+
 def vehicle_lookup(db: Session, vehicle: Vehicle) -> VehicleLookup:
     permit = active_permit(db, vehicle)
     owner = db.get(Person, vehicle.owner_person_id) if vehicle.owner_person_id else None
@@ -136,6 +152,7 @@ def duplicate_candidates(db: Session, complaint: Complaint) -> list[DuplicateCan
             Complaint.vehicle_id == complaint.vehicle_id,
             Complaint.id != complaint.id,
             Complaint.reference_number.is_not(None),
+            func.coalesce(Complaint.registered_at, Complaint.created_at) >= datetime.now(LOCAL) - timedelta(days=DUPLICATE_WINDOW_DAYS),
         )
     )
     chosen = dict(
@@ -146,15 +163,18 @@ def duplicate_candidates(db: Session, complaint: Complaint) -> list[DuplicateCan
         ).all()
     )
     mine = (complaint.subject or "").lower()
-    candidates = [
-        DuplicateCandidate(
-            id=other.id,
-            reference_number=other.reference_number,
-            subject=other.subject,
-            status=other.status,
-            match=round(SequenceMatcher(None, mine, (other.subject or "").lower()).ratio() * 100),
-            link_type=chosen.get(other.id),
+    candidates = []
+    for other in earlier:
+        match = round(SequenceMatcher(None, mine, (other.subject or "").lower()).ratio() * 100)
+        candidates.append(
+            DuplicateCandidate(
+                id=other.id,
+                reference_number=other.reference_number,
+                subject=other.subject,
+                status=other.status,
+                match=match,
+                link_type=chosen.get(other.id),
+                must_decide=match >= MUST_DECIDE_MATCH,
+            )
         )
-        for other in earlier
-    ]
     return sorted(candidates, key=lambda c: c.match, reverse=True)[:MAX_DUPLICATES]

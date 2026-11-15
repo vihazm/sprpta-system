@@ -228,6 +228,11 @@ export async function lookupVehicle(number: string) {
   return mapData(result, toVehicle);
 }
 
+export async function lookupPermit(number: string) {
+  const result = await api<ApiVehicle>(`${COMPLAINTS}/lookup/permit?${new URLSearchParams({ number })}`);
+  return mapData(result, toVehicle);
+}
+
 export async function searchPeople(search: string, type?: PersonType) {
   const params = new URLSearchParams({ search });
   if (type) params.set("person_type", type);
@@ -286,6 +291,7 @@ type ApiCandidate = {
   subject: string | null;
   match: number;
   link_type: DuplicateChoice | null;
+  must_decide: boolean;
 };
 
 function toCandidates(candidates: ApiCandidate[]): DuplicateCandidate[] {
@@ -295,6 +301,7 @@ function toCandidates(candidates: ApiCandidate[]): DuplicateCandidate[] {
     subject: c.subject,
     match: c.match,
     choice: c.link_type,
+    mustDecide: c.must_decide,
   }));
 }
 

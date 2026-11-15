@@ -550,3 +550,58 @@ def test_audio_and_video_are_checked_by_their_contents_and_their_own_size_limit(
     assert ok_audio.status_code == 201  # over the 10 MB of a document, within the audio limit
     big_doc = client.post(uri, files={"file": ("a.pdf", b"%PDF-" + b"x" * (10 * 1024 * 1024), "application/pdf")})
     assert big_doc.status_code == 413
+
+
+# ---------------------------------------------------------------- possible duplicates: only close, recent ones block
+
+
+def _register(client, lists, subject):
+    earlier = new_draft(client, lists, subject=subject)
+    assert client.post(f"{URL}/{earlier['id']}/incomplete").status_code == 200  # issues its reference number
+    return earlier
+
+
+def test_only_a_close_match_has_to_be_decided_before_forwarding(client, db, lists):
+    close = _register(client, lists, "Rude driver at the stand")
+    weak = _register(client, lists, "Zebra quantum")
+    draft = new_draft(client, lists, subject="Rude driver at the stand today")
+    found = {c["id"]: c for c in client.get(f"{URL}/{draft['id']}/duplicates").json()}
+    assert found[close["id"]]["must_decide"] is True and found[close["id"]]["match"] >= 40
+    assert found[weak["id"]]["must_decide"] is False and found[weak["id"]]["match"] < 40  # shown, but optional
+
+    blocked = client.post(f"{URL}/{draft['id']}/forward")
+    assert blocked.status_code == 409 and error_code(blocked) == "duplicate_undecided"
+    client.put(f"{URL}/{draft['id']}/duplicates/{close['id']}", json={"link_type": "not_duplicate"})
+    assert client.post(f"{URL}/{draft['id']}/forward").status_code == 200  # the weak one was never decided
+
+
+def test_a_case_registered_long_ago_is_not_a_possible_duplicate(client, db, lists):
+    old = _register(client, lists, "Rude driver at the stand")
+    row = db.get(Complaint, old["id"])
+    row.registered_at = datetime.now(LOCAL) - timedelta(days=40)
+    db.commit()
+    draft = new_draft(client, lists, subject="Rude driver at the stand")
+    assert client.get(f"{URL}/{draft['id']}/duplicates").json() == []
+    assert client.post(f"{URL}/{draft['id']}/forward").status_code == 200
+
+    recent = _register(client, lists, "Rude driver at the stand")
+    again = new_draft(client, lists, subject="Rude driver at the stand")
+    ids = [c["id"] for c in client.get(f"{URL}/{again['id']}/duplicates").json()]
+    assert recent["id"] in ids and old["id"] not in ids  # the recent one counts, the 40-day-old one still does not
+
+
+# ---------------------------------------------------------------- the permit lookup
+
+
+def test_a_permit_number_finds_its_vehicle(client, db, lists):
+    for typed in ("GL-BP-0101", "gl-bp-0101", " GL-BP-0101 ", "GL-BP- 0101"):
+        found = client.get(f"{URL}/lookup/permit", params={"number": typed})
+        assert found.status_code == 200, typed
+        assert found.json()["vehicle_number"] == "SP NB-2345" and found.json()["permit_number"] == "GL-BP-0101"
+    missing = client.get(f"{URL}/lookup/permit", params={"number": "NOPE-1"})
+    assert missing.status_code == 404 and error_code(missing) == "permit_not_found"
+    assert client.get(f"{URL}/lookup/permit", params={"number": ""}).status_code == 422
+    assert client.get(f"{URL}/lookup/permit", params={"number": "A" * 41}).status_code == 422
+    assert client.get(f"{URL}/lookup/permit", params={"number": "%"}).status_code == 404  # not a wildcard
+    client.post("/api/auth/logout")
+    assert client.get(f"{URL}/lookup/permit", params={"number": "GL-BP-0101"}).status_code == 401

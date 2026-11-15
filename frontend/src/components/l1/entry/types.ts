@@ -111,6 +111,7 @@ export type DuplicateCandidate = {
   subject: string | null;
   match: number; // 0 to 100
   choice: DuplicateChoice | null;
+  mustDecide: boolean; // a close match must be decided before forwarding; a weak one is optional
 };
 
 export type RejectionType = "invalid" | "spam" | "out_of_jurisdiction" | "duplicate";

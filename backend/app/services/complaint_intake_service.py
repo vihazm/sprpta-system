@@ -313,6 +313,14 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
         vehicle = lookup.find_vehicle(db, number) if number else None
         permit = lookup.active_permit(db, vehicle) if vehicle else None
         complaint.bus_verification = "unverified" if vehicle else ("not_found" if number else None)
+        if vehicle is not None and data.complaint_date is not None:
+            from app.services import bus_lookup_service  # imported here: it imports ComplaintError from this module
+
+            on_date, _reason = bus_lookup_service.bus_status_on(db, vehicle.id, data.complaint_date)
+            if on_date == "did_not_operate":  # the records say the bus was not running that day
+                complaint.bus_verification = "not_operated"
+            elif on_date == "cancelled":
+                complaint.bus_verification = "trip_cancelled"
         complaint.complaint_date = data.complaint_date
         complaint.route_stand_id = data.route_stand_id
         complaint.permit_id = permit.id if permit else None
@@ -330,10 +338,12 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
             raise ComplaintError(422, "trip_mismatch", "The selected bus record is for another bus. Choose the bus again.")
         reported = number  # what the officer typed stays as the reported number if it was not this bus
         number = vehicle.vehicle_number
-        corrected = bool(reported) and reported.strip().upper() != number.upper()
+        corrected = bool(reported) and typed is None  # a number that matches no bus on record was a typing mistake
         if corrected:
             number = reported
         complaint.bus_verification = "corrected" if corrected else "verified"
+        if trip.trip_status == "cancelled":  # the record says this trip did not run
+            complaint.bus_verification = "trip_cancelled"
         complaint.complaint_date = trip.service_date
         complaint.route_stand_id = trip.route_stand_id
         complaint.permit_id = trip.permit_id
@@ -447,9 +457,9 @@ def forward(db: Session, principal: Principal, complaint_id: int) -> ComplaintOu
     )
     if marked_duplicate:
         raise ComplaintError(409, "marked_duplicate", "This is marked as a duplicate. Reject it with a reason instead.")
-    if any(c.link_type is None for c in lookup.duplicate_candidates(db, complaint)):
+    if any(c.link_type is None and c.must_decide for c in lookup.duplicate_candidates(db, complaint)):
         raise ComplaintError(
-            409, "duplicate_undecided", "Choose for every possible duplicate whether it is a duplicate, related or not."
+            409, "duplicate_undecided", "Choose for every close possible duplicate whether it is a duplicate, related or not."
         )
 
     officer = db.scalar(select(User).where(User.role == UserRole.L2, User.is_active, User.area_id == complaint.area_id))

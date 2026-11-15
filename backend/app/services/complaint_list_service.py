@@ -4,10 +4,13 @@ Only what Level 1 may see is returned: the entry details and where the case went
 review (reasoning, decision, AI output) is read here.
 """
 
+from datetime import datetime, timedelta
+
 from sqlalchemy import and_, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.enums import ComplaintStatus
+from app.core.timezone import LOCAL
 from app.models import (
     Area,
     Complaint,
@@ -20,6 +23,7 @@ from app.models import (
     User,
 )
 from app.schemas.l1_dashboard import ComplaintPage, ComplaintRow, ListFilter, ReferenceHit, Scope, TargetFilter
+from app.services.complaint_lookup_service import DUPLICATE_WINDOW_DAYS
 
 PAGE_SIZE = 10
 EDITABLE = (ComplaintStatus.DRAFT, ComplaintStatus.INCOMPLETE)
@@ -42,6 +46,7 @@ def undecided_duplicate():
         earlier.vehicle_id == Complaint.vehicle_id,
         earlier.id != Complaint.id,
         earlier.reference_number.is_not(None),
+        func.coalesce(earlier.registered_at, earlier.created_at) >= datetime.now(LOCAL) - timedelta(days=DUPLICATE_WINDOW_DAYS),
         ~decided,
     )
 

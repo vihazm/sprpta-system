@@ -65,6 +65,14 @@ def find_vehicle(number: Annotated[str, NoNul, Query(min_length=1, max_length=20
     return lookup.vehicle_lookup(db, vehicle)
 
 
+@router.get("/lookup/permit", response_model=VehicleLookup)
+def find_permit(number: Annotated[str, NoNul, Query(min_length=1, max_length=40)], db: Session = Depends(get_db)):
+    vehicle = lookup.find_permit_vehicle(db, number)
+    if vehicle is None:
+        raise error(404, "permit_not_found", "No permit on record has that number.")
+    return lookup.vehicle_lookup(db, vehicle)
+
+
 @router.get("/lookup/people", response_model=list[PersonLookup])
 def find_people(
     search: Annotated[str, NoNul, Query(max_length=100)] = "",

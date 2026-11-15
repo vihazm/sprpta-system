@@ -121,6 +121,7 @@ class DuplicateCandidate(BaseModel):
     status: ComplaintStatus
     match: int  # 0 to 100, how alike the two subjects are
     link_type: DuplicateLinkType | None  # L1's choice so far, if any
+    must_decide: bool  # a close match has to be decided before forwarding; a weak one is shown but optional
 
 
 # ---------------------------------------------------------------- the complaint

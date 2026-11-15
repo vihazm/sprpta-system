@@ -6,12 +6,24 @@ from sqlalchemy import func, select
 
 from app.core.roles import UserRole
 from app.main import app
-from app.models import AuditLog, Complaint, ComplaintDutySnapshot, DailyTrip, OwnerAssignment, Permit, Vehicle
+from datetime import timedelta
+
+from app.models import (
+    AuditLog,
+    BusNonOperation,
+    Complaint,
+    ComplaintDutySnapshot,
+    DailyTrip,
+    OwnerAssignment,
+    Permit,
+    Vehicle,
+)
 from app.services import audit_service
 from tests.conftest import make_user, sign_in, target_id
 from tests.test_bus_lookup import (  # noqa: F401  (the fixtures and helpers of the lookup tests)
     ADMIN,
     COMPLAINTS,
+    DAY,
     LOOKUP,
     complaint_body,
     complaint_lists,
@@ -206,3 +218,36 @@ def test_the_complainant_type_is_saved_and_only_known_types_are_accepted(client,
     assert client.get(f"{COMPLAINTS}/{saved['id']}").json()["complainant_type"] == "conductor"
     assert client.post(COMPLAINTS, json=complaint_body(None, complainant_type="alien")).status_code == 422
     assert client.post(COMPLAINTS, json=complaint_body(None)).json()["complainant_type"] is None
+
+
+# ---------------------------------------------------------------- what checking the bus found
+
+
+def test_the_same_bus_typed_in_another_format_is_verified_not_corrected(client, db, world, complaint_lists):
+    trip = publish_trip(world)
+    for typed in ("nd 7782", "ND7782", "nd-7782", " ND-7782 "):
+        saved = client.post(COMPLAINTS, json=complaint_body(trip["id"], vehicle_number=typed)).json()
+        assert saved["bus_verification"] == "verified", typed
+        assert saved["vehicle_number"] == "ND-7782", typed  # the number on record, not the way it was typed
+
+
+def test_a_cancelled_trip_is_flagged_trip_cancelled(client, db, world, complaint_lists):
+    trip = publish_trip(world)
+    db.get(DailyTrip, trip["id"]).trip_status = "cancelled"
+    db.commit()
+    chosen = client.post(COMPLAINTS, json=complaint_body(trip["id"])).json()
+    assert chosen["bus_verification"] == "trip_cancelled" and chosen["trip_id"] == trip["id"]
+    typed = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ND-7782", complaint_date=DAY.isoformat())).json()
+    assert typed["bus_verification"] == "trip_cancelled"  # every published trip of that day was cancelled
+
+
+def test_a_bus_the_records_say_did_not_operate_is_flagged_not_operated(client, db, world, complaint_lists):
+    db.add(BusNonOperation(vehicle_id=world.bus.id, start_date=DAY, end_date=DAY, reason="maintenance"))
+    db.commit()
+    stopped = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ND-7782", complaint_date=DAY.isoformat())).json()
+    assert stopped["bus_verification"] == "not_operated"
+    other_day = (DAY - timedelta(days=3)).isoformat()
+    ran = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ND-7782", complaint_date=other_day)).json()
+    assert ran["bus_verification"] == "unverified"  # no record either way: nothing is assumed
+    undated = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ND-7782")).json()
+    assert undated["bus_verification"] == "unverified"
