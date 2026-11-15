@@ -166,3 +166,43 @@ def test_only_level_one_can_read_a_saved_complaints_bus_details(client, db, worl
     saved = client.post(COMPLAINTS, json=complaint_body(trip["id"])).json()
     assert world.admin.get(f"{COMPLAINTS}/{saved['id']}").status_code == 403
     assert TestClient(app).get(f"{COMPLAINTS}/{saved['id']}").status_code == 401
+
+
+# ---------------------------------------------------------------- what the officer typed, and what checking found
+
+
+def test_a_wrong_number_typed_before_choosing_the_trip_is_kept_and_flagged_as_corrected(client, db, world, complaint_lists):
+    trip = publish_trip(world)
+    body = complaint_body(trip["id"], vehicle_number="ND-7783")  # one digit off: no such bus on record
+    saved = client.post(COMPLAINTS, json=body)
+    assert saved.status_code == 201, saved.text
+    out = saved.json()
+    assert out["vehicle_number"] == "ND-7783"  # the reported number is never silently replaced
+    assert out["bus_verification"] == "corrected" and out["trip_id"] == trip["id"]
+    row = db.get(Complaint, out["id"])
+    assert row.vehicle_id == world.bus.id and row.vehicle_number_entered == "ND-7783"  # the verified bus is stored apart
+
+
+def test_the_right_number_with_a_trip_is_verified_and_a_different_real_bus_is_refused(client, db, world, complaint_lists):
+    trip = publish_trip(world)
+    ok = client.post(COMPLAINTS, json=complaint_body(trip["id"], vehicle_number="nd-7782")).json()
+    assert ok["bus_verification"] == "verified" and ok["vehicle_number"] == "ND-7782"
+    other = client.post(COMPLAINTS, json=complaint_body(trip["id"], vehicle_number="ND-7980"))
+    assert other.status_code == 422 and error_code(other) == "trip_mismatch"  # another real bus is a conflict, not a typo
+
+
+def test_without_a_trip_the_bus_is_unverified_or_not_found(client, db, world, complaint_lists):
+    known = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ND-7782")).json()
+    assert known["bus_verification"] == "unverified" and known["trip_id"] is None
+    unknown = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number="ZZ-0000")).json()
+    assert unknown["bus_verification"] == "not_found" and unknown["vehicle_number"] == "ZZ-0000"
+    blank = client.post(COMPLAINTS, json=complaint_body(None, vehicle_number=None)).json()
+    assert blank["bus_verification"] is None
+
+
+def test_the_complainant_type_is_saved_and_only_known_types_are_accepted(client, db, world, complaint_lists):
+    saved = client.post(COMPLAINTS, json=complaint_body(None, complainant_type="conductor")).json()
+    assert saved["complainant_type"] == "conductor"
+    assert client.get(f"{COMPLAINTS}/{saved['id']}").json()["complainant_type"] == "conductor"
+    assert client.post(COMPLAINTS, json=complaint_body(None, complainant_type="alien")).status_code == 422
+    assert client.post(COMPLAINTS, json=complaint_body(None)).json()["complainant_type"] is None
