@@ -16,6 +16,8 @@
   --color-ok-glow: #34d399;
   --color-bad-glow: #f87171;
   --animate-island-in: island-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* a page's content settling in once its data has arrived (components/portal/Reveal.tsx) */
+  --animate-reveal: reveal 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
   --font-display: var(--font-baskerville), Georgia, serif;
 }
 
@@ -48,6 +50,30 @@ body {
     opacity: 1;
     transform: none;
   }
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+}
+
+/* Placeholder blocks shown while a page's data loads (components/portal/Skeleton.tsx):
+   a soft light band sweeps across them. With reduced motion they simply stay still. */
+@keyframes shimmer {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+.skeleton {
+  background-image: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.75) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 .focus-ring:focus-visible {

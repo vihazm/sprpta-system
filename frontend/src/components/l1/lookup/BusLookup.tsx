@@ -7,11 +7,12 @@ import { Card, CardHeading, PillButton } from "@/components/dashboard/ui";
 import { BusLookupPanel } from "./BusLookupPanel";
 import { DailyRecordForm } from "./DailyRecordForm";
 import { MyDailyRecords } from "./MyDailyRecords";
+import type { DailyRecordPage } from "./records-api";
 
 // The Bus & permit lookup screen. "Use Details in Complaint" opens the New complaint form with the chosen record;
 // when the officer came from a saved draft ("Reopen bus lookup"), it replaces that draft's bus instead.
 // "Add Daily Bus Record" opens the entry form; what is saved there waits as Pending Verification for Admin.
-export function BusLookup() {
+export function BusLookup({ initialRecords }: { initialRecords?: DailyRecordPage }) {
   const router = useRouter();
   const draft = useSearchParams().get("complaint") ?? "";
   const complaintId = /^[1-9]\d{0,15}$/.test(draft) ? Number(draft) : undefined;
@@ -62,7 +63,7 @@ export function BusLookup() {
         </Card>
       )}
 
-      <MyDailyRecords refresh={refresh} onOpen={(id) => setEditing(id)} />
+      <MyDailyRecords refresh={refresh} onOpen={(id) => setEditing(id)} initial={initialRecords} />
     </div>
   );
 }

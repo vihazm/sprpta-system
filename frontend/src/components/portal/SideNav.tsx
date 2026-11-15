@@ -1,8 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import type { NavItem } from "@/lib/roles";
+
+/** Sits inside a link and marks it while its page is loading, so the link can show it was pressed. */
+function Pending() {
+  const { pending } = useLinkStatus();
+  return <span hidden data-pending={pending ? "" : undefined} />;
+}
 
 /** Side navigation: only the items of the signed-in role (UI Flow 1.3). */
 export function SideNav({ items }: { items: NavItem[] }) {
@@ -18,13 +24,15 @@ export function SideNav({ items }: { items: NavItem[] }) {
             key={item.label}
             href={item.href}
             aria-current={pathname === item.href ? "page" : undefined}
-            className={`focus-ring rounded-[0.9rem] px-[0.95rem] py-[0.65rem] text-[0.92rem] font-bold transition-colors ${
+            // Pressed: crimson at once while the mouse is down, and until the page has loaded.
+            className={`focus-ring rounded-[0.9rem] px-[0.95rem] py-[0.65rem] text-[0.92rem] font-bold transition-colors duration-100 active:bg-crimson active:text-white has-[[data-pending]]:bg-crimson has-[[data-pending]]:text-white ${
               pathname === item.href
                 ? "bg-crimson text-white"
                 : "text-slate-ink hover:bg-field"
             }`}
           >
             {item.label}
+            <Pending />
           </Link>
         ) : (
           <span

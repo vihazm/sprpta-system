@@ -2,6 +2,12 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "imports": {
+    "#transport": {
+      "react-server": "./src/lib/transport-server.ts",
+      "default": "./src/lib/transport-browser.ts"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
