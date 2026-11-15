@@ -3,27 +3,6 @@ import type { L1DashboardData } from "./types";
 // Sample figures so the dashboard can be reviewed before the complaints module exists.
 // Replace this with a fetch when the API does.
 export const l1DashboardSample: L1DashboardData = {
-  day: { entered: 7, forwarded: 5, stillOpen: 2, thisWeek: 38, thisMonth: 142 },
-  queues: [
-    { kind: "portal", title: "Portal submissions", note: "Awaiting your check", count: 4 },
-    { kind: "drafts", title: "Drafts", note: "Started, no reference yet", count: 3 },
-    { kind: "incomplete", title: "Incomplete", note: "Details missing, clock paused", count: 5 },
-    { kind: "duplicates", title: "Possible duplicates", note: "Compare before forwarding", count: 2 },
-  ],
-  waiting: [
-    { ref: "C-2026-00401", title: "Staff misconduct at Galle stand", status: "Draft", age: "2 d" },
-    { ref: "C-2026-00406", title: "Trishaw driver refused a hire", status: "Incomplete", age: "1 d" },
-    { ref: "C-2026-00409", title: "Reckless driving near Weligama", status: "Incomplete", age: "1 d" },
-    { ref: "C-2026-00412", title: "Bus left stand before time", status: "Possible duplicate", age: "3 h" },
-    { ref: "C-2026-00415", title: "Overcharging on fare", status: "Incomplete", age: "2 h" },
-    { ref: null, title: "Rude behaviour by conductor", status: "Draft", age: "20 m" },
-  ],
-  portal: [
-    { title: "Bus skipped scheduled stops", meta: "M. Perera · NB-3310 · 12 min ago" },
-    { title: "Trishaw driver refused the meter", meta: "S. Fernando · TW-8827 · 38 min ago" },
-    { title: "Conductor used abusive language", meta: "A. Kumari · NB-2204 · 1 h ago" },
-    { title: "Overloaded bus on Route 349", meta: "R. Jayasinghe · NB-5105 · 2 h ago" },
-  ],
   sources: [
     { label: "WhatsApp", count: 46 },
     { label: "Email", count: 31 },

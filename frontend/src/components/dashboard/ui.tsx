@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ReactNode } from "react";
 // Small building blocks shared by the dashboards of every role.
 
@@ -106,5 +107,30 @@ export function PillButton({
     >
       {children}
     </button>
+  );
+}
+
+// The same look as a PillButton, for something that opens another screen.
+export function PillLink({
+  href,
+  children,
+  primary = false,
+  className = "",
+}: {
+  href: string;
+  children: ReactNode;
+  primary?: boolean;
+  className?: string;
+}) {
+  const look = primary
+    ? "border-crimson bg-crimson text-white hover:bg-crimson-hover"
+    : "border-[#E5E7EB] bg-white text-slate-ink hover:border-crimson hover:text-crimson";
+  return (
+    <Link
+      href={href}
+      className={`focus-ring inline-flex h-[2.1rem] cursor-pointer items-center justify-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-[0.95rem] text-[0.78rem] font-bold transition-colors ${look} ${className}`}
+    >
+      {children}
+    </Link>
   );
 }

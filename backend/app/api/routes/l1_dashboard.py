@@ -1,0 +1,20 @@
+"""The Level 1 dashboard summary: /api/l1/dashboard (office staff only)."""
+
+from fastapi import APIRouter, Depends, Response
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_principal, require_roles
+from app.db.session import get_db
+from app.schemas.l1_dashboard import DashboardOut
+from app.services import l1_dashboard_service
+from app.services.auth_service import Principal
+
+router = APIRouter(prefix="/api/l1/dashboard", tags=["l1"], dependencies=[Depends(require_roles("l1"))])
+
+
+@router.get("", response_model=DashboardOut)
+def dashboard(
+    response: Response, officer: Principal = Depends(get_current_principal), db: Session = Depends(get_db)
+) -> DashboardOut:
+    response.headers["Cache-Control"] = "no-store"
+    return l1_dashboard_service.dashboard(db, officer)

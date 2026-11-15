@@ -4,17 +4,30 @@ import type { Severity } from "@/components/dashboard/severity";
 
 export type QueueKind = "portal" | "drafts" | "incomplete" | "duplicates";
 
-export type QueueCount = { kind: QueueKind; title: string; note: string; count: number };
+// Who a complaint is against, as the Complaints page and the dashboard count it.
+export type TargetFilter = "driver" | "conductor" | "owner" | "bus_service" | "other" | "unclassified";
 
-export type WaitingCase = {
-  ref: string | null; // a draft has no reference number yet
-  title: string;
-  status: "Draft" | "Incomplete" | "Possible duplicate";
-  age: string;
+// The numbers on the Level 1 dashboard, from GET /api/l1/dashboard.
+export type DashboardSummary = {
+  day: { entered: number; forwarded: number; stillOpen: number }; // this officer's own day, in Sri Lankan time
+  weekEntered: number;
+  monthEntered: number;
+  queues: Record<QueueKind, number>; // the shared Level 1 queues
+  byTarget: Record<TargetFilter, number>; // this officer's own complaints, by who they are against
+  waiting: WaitingCase[];
+  portal: PortalSubmission[];
 };
 
-export type PortalSubmission = { title: string; meta: string };
+export type WaitingCase = {
+  id: number;
+  reference: string | null; // a draft has no reference number yet
+  title: string;
+  status: "Draft" | "Incomplete";
+  possibleDuplicate: boolean;
+  ageMinutes: number;
+};
 
+export type PortalSubmission = { id: number; title: string; complainant: string | null; ageMinutes: number };
 export type Count = { label: string; count: number };
 
 export type AreaTotal = { name: string; count: number; hasOfficer: boolean };
@@ -29,10 +42,6 @@ export type ForwardedCase = {
 };
 
 export type L1DashboardData = {
-  day: { entered: number; forwarded: number; stillOpen: number; thisWeek: number; thisMonth: number };
-  queues: QueueCount[];
-  waiting: WaitingCase[];
-  portal: PortalSubmission[];
   sources: Count[]; // complaints this month by medium
   busiestThisWeek: { medium: string; count: number; total: number };
   lookup: { query: string; rows: { label: string; value: string }[] };
