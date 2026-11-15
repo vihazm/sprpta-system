@@ -1,6 +1,6 @@
 """The Level 1 complaint form: /api/l1/complaints (office staff only)."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, Query, Response, UploadFile
 from sqlalchemy.orm import Session
@@ -9,20 +9,23 @@ from app.api.deps import error, get_current_principal, require_roles
 from app.core.enums import ComplaintStatus, PersonType
 from app.db.session import get_db
 from app.schemas.admin_users import MAX_ID, NoNul
+from app.schemas.l1_dashboard import ComplaintPage, ListFilter, ReferenceHit, Scope, TargetFilter
 from app.schemas.l1_complaints import (
     AttachmentOut,
+    CategoryOption,
     ComplaintForm,
-    ComplaintListItem,
     ComplaintOut,
     DuplicateCandidate,
     DuplicateChoice,
     FormOptions,
     PersonLookup,
     RejectBody,
+    TargetOption,
     VehicleLookup,
 )
 from app.services import complaint_attachment_service as attachments
 from app.services import complaint_intake_service as intake
+from app.services import complaint_list_service as lists
 from app.services import complaint_lookup_service as lookup
 from app.services.auth_service import Principal
 from app.services.complaint_intake_service import ComplaintError
@@ -62,6 +65,14 @@ def find_vehicle(number: Annotated[str, NoNul, Query(min_length=1, max_length=20
     return lookup.vehicle_lookup(db, vehicle)
 
 
+@router.get("/lookup/permit", response_model=VehicleLookup)
+def find_permit(number: Annotated[str, NoNul, Query(min_length=1, max_length=40)], db: Session = Depends(get_db)):
+    vehicle = lookup.find_permit_vehicle(db, number)
+    if vehicle is None:
+        raise error(404, "permit_not_found", "No permit on record has that number.")
+    return lookup.vehicle_lookup(db, vehicle)
+
+
 @router.get("/lookup/people", response_model=list[PersonLookup])
 def find_people(
     search: Annotated[str, NoNul, Query(max_length=100)] = "",
@@ -74,9 +85,44 @@ def find_people(
 # ---------------------------------------------------------------- the complaint
 
 
-@router.get("", response_model=list[ComplaintListItem])
-def list_open(status: ComplaintStatus | None = None, db: Session = Depends(get_db)) -> list[ComplaintListItem]:
-    return intake.list_open(db, status)
+@router.get("/by-reference", response_model=ReferenceHit)
+def find_by_reference(
+    reference: Annotated[str, NoNul, Query(min_length=1, max_length=40)], db: Session = Depends(get_db)
+) -> ReferenceHit:
+    hit = lists.find_by_reference(db, reference)
+    if hit is None:
+        raise error(404, "reference_not_found", "No complaint has that reference number.")
+    return hit
+
+
+@router.get("/targets", response_model=list[TargetOption])
+def targets(db: Session = Depends(get_db)) -> list[TargetOption]:
+    """Who a complaint can be against."""
+    return lookup.list_targets(db)
+
+
+@router.get("/categories", response_model=list[CategoryOption])
+def categories(target_id: Annotated[int | None, Query(ge=1, le=MAX_ID)] = None, db: Session = Depends(get_db)) -> list[CategoryOption]:
+    """The issue categories open to a target (every category where none has been approved for it)."""
+    return lookup.allowed_categories(db, target_id)
+
+
+@router.get("", response_model=ComplaintPage)
+def list_complaints(
+    status: ListFilter | None = None,
+    target: TargetFilter | None = None,
+    scope: Scope = "mine",
+    category_id: int | None = Query(None, ge=1),
+    verification: Literal["failed", "non_operating"] | None = None,
+    search: Annotated[str, NoNul, Query(max_length=100)] = "",
+    page: int = Query(1, ge=1),
+    officer: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+) -> ComplaintPage:
+    return lists.list_complaints(
+        db, status=status, target=target, scope=scope, officer_id=officer.id, search=search, page=page,
+        category_id=category_id, verification=verification,
+    )
 
 
 @router.post("", response_model=ComplaintOut, status_code=201)
@@ -98,9 +144,14 @@ def get_complaint(complaint_id: ComplaintId, db: Session = Depends(get_db)) -> C
 
 
 @router.put("/{complaint_id}", response_model=ComplaintOut)
-def update_complaint(complaint_id: ComplaintId, body: ComplaintForm, db: Session = Depends(get_db)) -> ComplaintOut:
+def update_complaint(
+    complaint_id: ComplaintId,
+    body: ComplaintForm,
+    user: Principal = Depends(get_current_principal),
+    db: Session = Depends(get_db),
+) -> ComplaintOut:
     try:
-        return intake.update_complaint(db, complaint_id, body)
+        return intake.update_complaint(db, user, complaint_id, body)
     except ComplaintError as exc:
         raise _fail(exc) from None
 

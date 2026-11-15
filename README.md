@@ -10,7 +10,7 @@ Stack: Next.js 16 (React 19, TypeScript, Tailwind CSS 4) + FastAPI (Python) + Po
 - Python 3.13+
 - PostgreSQL (create an empty database named `sprpta_db`)
 - Git
-
+Q
 ## Setup
 
 Backend:

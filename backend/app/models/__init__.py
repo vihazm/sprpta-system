@@ -13,11 +13,14 @@ from app.models.complaint import (
     ImplementationRecord,
     SolutionDocument,
 )
+from app.models.duty_record import ComplaintDutySnapshot, DailyTrip, OwnerAssignment, TripDuty
 from app.models.health_check import HealthCheck
 from app.models.health_event import HealthEvent
 from app.models.master_data import (
     ComplaintCategory,
+    ComplaintCategoryTarget,
     ComplaintMedium,
+    ComplaintTargetType,
     Permit,
     Person,
     RouteStand,
@@ -28,6 +31,7 @@ from app.models.messaging import MessageTemplate, OutboundMessage
 from app.models.otp_code import OtpCode
 from app.models.rating import RatingAppeal, RatingSnapshot
 from app.models.recommendation import Recommendation
+from app.models.synthetic import BusNonOperation, RouteAuthorization, SyntheticBatch, SyntheticComplaintEvent
 from app.models.system_setting import SystemSetting
 from app.models.usage_log import UsageLog
 from app.models.user import User
@@ -36,12 +40,17 @@ __all__ = [
     "Area",
     "AuditLog",
     "AuthSession",
+    "BusNonOperation",
     "CaseDecision",
     "ComplainantAccount",
     "Complaint",
     "ComplaintAttachment",
     "ComplaintCategory",
+    "ComplaintCategoryTarget",
+    "ComplaintDutySnapshot",
     "ComplaintMedium",
+    "ComplaintTargetType",
+    "DailyTrip",
     "DuplicateCheck",
     "Escalation",
     "HealthCheck",
@@ -50,15 +59,20 @@ __all__ = [
     "MessageTemplate",
     "OtpCode",
     "OutboundMessage",
+    "OwnerAssignment",
     "Permit",
     "Person",
     "RatingAppeal",
     "RatingSnapshot",
     "Recommendation",
+    "RouteAuthorization",
     "RouteStand",
     "Severity",
     "SolutionDocument",
+    "SyntheticBatch",
+    "SyntheticComplaintEvent",
     "SystemSetting",
+    "TripDuty",
     "UsageLog",
     "User",
     "Vehicle",

@@ -4,7 +4,18 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import admin_dashboard, admin_system_health, admin_users, auth, l1_complaints, l1_recommendations
+from app.api.routes import (
+    admin_dashboard,
+    admin_duty_records,
+    admin_system_health,
+    admin_users,
+    auth,
+    l1_bus_lookup,
+    l1_complaints,
+    l1_daily_records,
+    l1_dashboard,
+    l1_recommendations,
+)
 from app.core.config import settings
 from app.core.csrf import csrf_guard
 from app.services import health_check_service
@@ -34,6 +45,10 @@ app.include_router(auth.router)
 app.include_router(admin_dashboard.router)
 app.include_router(admin_system_health.router)
 app.include_router(admin_users.router)
+app.include_router(admin_duty_records.router)
+app.include_router(l1_bus_lookup.router)
+app.include_router(l1_dashboard.router)
+app.include_router(l1_daily_records.router)
 app.include_router(l1_complaints.router)
 app.include_router(l1_recommendations.router)
 

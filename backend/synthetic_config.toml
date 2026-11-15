@@ -1,0 +1,118 @@
+# Assumptions for the SYNTHETIC bus operations and complaints generator (development data only).
+#
+# Nothing here is a real timetable, a real duty roster or real operating history. The permit workbook says which
+# buses hold permits on which route; it does not say how often a bus runs. These numbers are simulation inputs
+# that can be reviewed and changed. Change them, then run `python -m app.synthetic plan` to see the effect.
+
+[general]
+start = "2026-01-01"
+end = "2026-11-15"
+seed = 20260115
+batch_name = "sprpta-synthetic-v1"
+demo_officer_login = "test_office@sprpta.test"  # the demo Level 1 account that is given a share of the complaints
+demo_officer_share = 0.34
+synthetic_officers = 3  # extra fictional Level 1 officers
+admin_login = "system_admin@sprpta.test"
+
+# Which routes and how much of the period each scale covers. The last N days are always the densest.
+# dense_days / earlier_day_fraction: every bus is simulated on each of the last dense_days days, but on only this
+# share of the earlier days. That keeps the large scale to about 600,000 trips instead of 1.2 million, while every
+# route and the whole period are still represented. A day that was not simulated simply has no record.
+[scales.small]
+routes_per_tier_per_office = 1   # one high, one medium and one low route in each office
+days = 21
+min_complaints = 300
+
+[scales.medium]
+route_fraction = 0.25
+days = 120
+min_complaints = 2500
+
+[scales.large]
+route_fraction = 1.0
+days = 319
+dense_days = 120
+earlier_day_fraction = 0.20
+min_complaints = 6000
+
+# Route size profiles, chosen by how many buses hold permits on the route.
+# legs = the possible number of one-way trips a bus makes on a day it operates (a pick is made at random).
+# leg_minutes = the range a route's one-way duration is drawn from (fixed per route). service_* = first and last departure.
+[profiles.high]
+min_buses = 25
+legs = [2, 3, 4, 4]
+leg_minutes = [60, 120]
+service_start = "05:15"
+service_end = "19:30"
+complaint_weight = 1.6
+
+[profiles.medium]
+min_buses = 10
+legs = [2, 2, 3, 4]
+leg_minutes = [50, 110]
+service_start = "05:30"
+service_end = "19:00"
+complaint_weight = 1.2
+
+[profiles.low_mid]
+min_buses = 3
+legs = [2, 2, 3]
+leg_minutes = [35, 90]
+service_start = "06:00"
+service_end = "18:30"
+complaint_weight = 1.0
+
+[profiles.low]
+min_buses = 1
+legs = [1, 2, 2]
+leg_minutes = [25, 70]
+service_start = "06:30"
+service_end = "17:30"
+complaint_weight = 0.6
+
+[timetable]
+turnaround_minutes = [10, 20]
+rest_break_minutes = [30, 45]   # between the two halves of a day with three or more legs
+stagger_minutes = 150           # buses on one route start spread over this window
+delay_probability = 0.15
+delay_minutes = [3, 35]
+cancel_trip_probability = 0.02  # a single trip cancelled, the bus still running the rest of its day
+partial_trip_probability = 0.004  # breakdown on the road: the trip stops early, the bus is out of service after it
+
+# Days a bus does not operate. Rates are per bus per day unless stated.
+[non_operation]
+rest_day_probability = 0.05
+sunday_rest_day_probability = 0.14
+maintenance_per_bus_year = 0.7
+maintenance_days = [2, 10]
+breakdown_per_bus_year = 1.5
+breakdown_days = [1, 3]
+permit_suspension_per_bus_year = 0.03
+permit_suspension_days = [5, 20]
+
+[staff]
+relief_pool_share = 0.12        # relief drivers/conductors as a share of the number of buses, per office
+replacement_day_probability = 0.04   # a regular driver or conductor is away (leave, sickness) for the day
+shift_change_probability = 0.18      # the second half of a day is worked by someone else
+
+[ownership]
+single = 0.60
+two = 0.20
+three_to_five = 0.15
+six_to_twelve = 0.05
+change_probability = 0.04       # a bus changes owner once during the period
+
+[route_changes]
+temporary_probability = 0.03    # a bus runs another route of its office for a while
+temporary_days = [14, 45]
+permanent_probability = 0.01    # a bus moves to another route for the rest of the period
+
+[complaints]
+per_10k_trips = 75
+# Shares of the complaints, each a scenario of its own.
+non_operating_rate = 0.08
+wrong_bus_number_rate = 0.07
+verification_failure_rate = 0.04     # a real bus and date that no selectable trip record supports
+duplicate_rate = 0.10                # extra complaints about an incident already reported
+target_weights = { driver = 35, conductor = 30, owner = 8, bus_service = 22, other = 5 }
+complainant_weights = { passenger = 80, driver = 4, conductor = 4, owner = 4, other = 8 }

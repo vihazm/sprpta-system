@@ -7,7 +7,8 @@
 - Development only (APP_ENV=development): one demo account per role, so every
   role's redirect can be tried. Logins are emails, as the documents require.
   Also the lists the Level 1 complaint form needs (mediums, categories,
-  severities, a few demo vehicles, permits, owners and routes).
+  severities, a few demo vehicles, permits, owners and routes), and published
+  daily duty records for the Bus & Permit Lookup (yesterday and today).
 - Production: one admin from ADMIN_LOGIN / ADMIN_PASSWORD / ADMIN_NAME (set in
   the environment, never committed). The password is not defined by the
   documents ([OPEN] in the UI Flow doc), so it comes from the environment.
@@ -19,7 +20,7 @@ SEED_PASSWORD_SHAMILA_AD_MATARA=...
 """
 
 import os
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -27,20 +28,23 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.enums import PersonType, PlaceKind, VehicleType
+from app.core.enums import DutyRecordStatus, PersonType, PlaceKind, VehicleType
 from app.core.identifiers import normalise_identifier
 from app.core.roles import UserRole
 from app.core.security import hash_password
+from app.core.timezone import LOCAL
 from app.db.session import SessionLocal
 from app.models import (
     Area,
     ComplainantAccount,
     ComplaintCategory,
     ComplaintMedium,
+    DailyTrip,
     Permit,
     Person,
     RouteStand,
     Severity,
+    TripDuty,
     User,
     Vehicle,
 )
@@ -82,6 +86,8 @@ DEV_VEHICLES = [
     ("Galle", "SP QA-1234", VehicleType.TRISHAW, "Sunil Jayasinghe", "GL-TP-0207", "Galle Fort stand"),
     ("Matara", "SP NC-4521", VehicleType.BUS, "Kamal Silva", "MT-BP-0112", "Matara - Colombo (route 2)"),
     ("Hambantota", "SP ND-7788", VehicleType.BUS, "Ruwan Fernando", "HB-BP-0123", "Hambantota - Tangalle (route 31)"),
+    # The bus the sample trips and sample complaints use; the client's workbook has it too, and then it is matched.
+    ("Galle", "ND-7782", VehicleType.BUS, "Piyal Gunasekara", "GL-BP-0102", "24/1 Avithtawa - Elpitiya"),
 ]
 DEV_PEOPLE = [
     # (name, type)
@@ -121,9 +127,63 @@ def _seed_complaint_lookups(db: Session, areas: dict[str, int]) -> None:
             db, Vehicle, {"vehicle_number": number},
             vehicle_type=vehicle_type, registered_area_id=areas[area], owner_person_id=owner.id,
         )
-        _get_or_create(db, Permit, {"permit_number": permit_number}, vehicle_id=vehicle.id, holder_person_id=owner.id)
         kind = PlaceKind.STAND if "stand" in place else PlaceKind.ROUTE
-        _get_or_create(db, RouteStand, {"kind": kind, "name": place, "area_id": areas[area]})
+        route = _get_or_create(db, RouteStand, {"kind": kind, "name": place, "area_id": areas[area]})
+        # The permit records its route (as the client's workbook import does), so the synthetic generator can run on
+        # these demo buses alone.
+        permit = _get_or_create(
+            db, Permit, {"permit_number": permit_number},
+            vehicle_id=vehicle.id, holder_person_id=owner.id, route_stand_id=route.id,
+        )
+        if permit.route_stand_id is None:
+            permit.route_stand_id = route.id
+
+
+# DEVELOPMENT ONLY: published daily records for the Bus & Permit Lookup, for yesterday and today.
+# (bus number, route, origin, destination, departure time, driver, conductor): a missing person stays Unavailable.
+DEV_TRIPS = [
+    ("SP NB-2345", "Galle - Matara (route 2)", "Galle", "Matara", time(6, 30), "Saman Kumara", "Chaminda Rathnayake"),
+    ("SP NB-2345", "Galle - Matara (route 2)", "Galle", "Matara", time(14, 15), "Saman Kumara", None),
+    ("ND-7782", "24/1 Avithtawa - Elpitiya", "Avithtawa", "Elpitiya", time(7, 0), "Saman Kumara", "Chaminda Rathnayake"),
+    ("ND-7782", "24/1 Avithtawa - Elpitiya", "Avithtawa", "Elpitiya", time(15, 30), None, None),
+]
+
+
+def _seed_duty_records(db: Session) -> None:
+    """Needs the demo vehicles; the buses from the client's workbook are used when they have been imported."""
+    print("Daily duty records (development only)")
+    admin = db.scalar(select(User).where(User.role == UserRole.ADMIN))
+    today = datetime.now(LOCAL).date()
+    now = datetime.now(LOCAL)
+    for number, route_name, origin, destination, departure, driver_name, conductor_name in DEV_TRIPS:
+        vehicle = db.scalar(select(Vehicle).where(Vehicle.vehicle_number == number))
+        route = db.scalar(select(RouteStand).where(RouteStand.name == route_name))
+        permit = db.scalar(select(Permit).where(Permit.vehicle_id == vehicle.id)) if vehicle else None
+        if admin is None or vehicle is None or route is None or permit is None:
+            print(f"  skipped {number} {departure:%H:%M}: the vehicle, its permit or the route is not in the database")
+            continue
+        for day in (today - timedelta(days=1), today):
+            if db.scalar(select(DailyTrip.id).where(
+                DailyTrip.service_date == day, DailyTrip.vehicle_id == vehicle.id, DailyTrip.departure_time == departure
+            )):
+                continue
+            trip = DailyTrip(
+                service_date=day, vehicle_id=vehicle.id, permit_id=permit.id, route_stand_id=route.id,
+                departure_time=departure, origin=origin, destination=destination, status=DutyRecordStatus.PUBLISHED,
+                created_by_user_id=admin.id, approved_by_user_id=admin.id, approved_at=now,
+                published_by_user_id=admin.id, published_at=now,
+            )
+            db.add(trip)
+            db.flush()
+            driver = db.scalar(select(Person).where(Person.full_name == driver_name)) if driver_name else None
+            conductor = db.scalar(select(Person).where(Person.full_name == conductor_name)) if conductor_name else None
+            if driver or conductor:
+                db.add(TripDuty(
+                    trip_id=trip.id, driver_person_id=driver.id if driver else None,
+                    conductor_person_id=conductor.id if conductor else None,
+                    verified_by_user_id=admin.id, verified_at=now,
+                ))
+            print(f"  created {number} {departure:%H:%M} on {day}")
 
 
 def _dev_password(login: str, demo_password: str) -> str:
@@ -181,6 +241,8 @@ def main() -> None:
                 else:
                     print(f"  exists  {email} (cp)")
             _seed_complaint_lookups(db, areas)
+            db.flush()
+            _seed_duty_records(db)
         else:
             login, password = os.environ.get("ADMIN_LOGIN"), os.environ.get("ADMIN_PASSWORD")
             if not login or not password:

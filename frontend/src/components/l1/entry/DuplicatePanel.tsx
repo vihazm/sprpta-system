@@ -26,6 +26,7 @@ export function DuplicatePanel({
           <div key={candidate.id} className="flex flex-col gap-2.5">
             <p className="text-[0.81rem] font-extrabold text-amber-900">
               Possible duplicate: {candidate.reference}, {candidate.subject ?? "no subject"}, {candidate.match}% match
+              {candidate.mustDecide ? "" : " (optional, a weak match)"}
             </p>
             <ChoiceGroup
               label={`Duplicate check for ${candidate.reference}`}

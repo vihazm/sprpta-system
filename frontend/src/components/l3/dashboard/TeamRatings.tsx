@@ -14,7 +14,7 @@ export function TeamRatings({ ratings, className = "" }: { ratings: RatingRow[];
         subtitle="Drivers, conductors and SPRPTA staff · rolling 12 months · only substantiated complaints count"
         action={<LinkButton>Open all ratings</LinkButton>}
       />
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full border-collapse text-[0.78rem]">
           <thead>
             <tr>
