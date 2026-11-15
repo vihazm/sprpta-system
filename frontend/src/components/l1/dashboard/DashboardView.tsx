@@ -1,9 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { formatToday, greeting } from "@/components/dashboard/dates";
 import { DashboardHero, HeroButton } from "@/components/dashboard/DashboardHero";
 import { Icon } from "@/components/dashboard/icons";
-import { muted } from "@/components/dashboard/ui";
+import { loadOverview } from "./api";
 import { useDashboard } from "./DashboardData";
 import { ComplaintSources } from "./ComplaintSources";
 import { ComplaintAnalytics } from "./ComplaintAnalytics";
@@ -17,15 +18,31 @@ import { ReferenceFinder } from "./ReferenceFinder";
 import { RecentlyForwarded } from "./RecentlyForwarded";
 import { RecommendationForm } from "./RecommendationForm";
 import { TransportSeverity } from "./TransportSeverity";
-import { l1DashboardSample } from "./sample-data";
+import type { DashboardOverview } from "./types";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-// The Level 1 office staff landing page (UC-L1-12). The banner, Your day so far, Needs attention, the portal
-// queue and Quick entry are live. The cards from "Where complaints come from" down still show sample figures.
+// The lower cards (sources, passed to Level 2, transport and severity, recently forwarded). They are read again
+// whenever the dashboard numbers are, for example after a complaint was forwarded.
+function useOverview(trigger: unknown): DashboardOverview | undefined {
+  const [overview, setOverview] = useState<DashboardOverview>();
+  useEffect(() => {
+    let current = true;
+    void loadOverview().then((result) => {
+      if (current && result.ok) setOverview(result.data);
+    });
+    return () => {
+      current = false;
+    };
+  }, [trigger]);
+  return overview;
+}
+
+// The Level 1 office staff landing page (UC-L1-12). Every figure and card is live: PostgreSQL aggregates over the
+// signed-in officer's own complaints, and the shared Level 1 queues.
 export function DashboardView({ name }: { name: string }) {
   const { data, error, loading, refresh } = useDashboard();
-  const sample = l1DashboardSample;
+  const overview = useOverview(data);
   const now = new Date();
 
   const waiting = data ? data.queues.drafts + data.queues.incomplete : 0;
@@ -87,26 +104,21 @@ export function DashboardView({ name }: { name: string }) {
 
         <RecommendationForm className="min-[1200px]:col-span-4" />
         <ComplaintSources
-          sources={sample.sources}
-          busiest={sample.busiestThisWeek}
+          sources={overview?.sources}
+          busiest={overview?.busiestWeek}
           className="min-[1200px]:col-span-4"
         />
-        <QuickLookup lookup={sample.lookup} className="min-[1200px]:col-span-4" />
+        <QuickLookup className="min-[1200px]:col-span-4" />
 
-        <PassedToLevel2 areas={sample.areas} className="min-[1200px]:col-span-7" />
+        <PassedToLevel2 areas={overview?.areas} className="min-[1200px]:col-span-7" />
         <TransportSeverity
-          transport={sample.transport}
-          severity={sample.severity}
+          transport={overview?.transport}
+          severity={overview?.severity}
           className="min-[1200px]:col-span-5"
         />
 
-        <RecentlyForwarded cases={sample.forwarded} className="min-[1200px]:col-span-12" />
+        <RecentlyForwarded cases={overview?.forwarded} className="min-[1200px]:col-span-12" />
       </div>
-
-      <p className={`${muted} px-1.5`}>
-        The cards from &ldquo;Where complaints come from&rdquo; down still show sample data. Their figures, names and
-        records are placeholders.
-      </p>
     </div>
   );
 }

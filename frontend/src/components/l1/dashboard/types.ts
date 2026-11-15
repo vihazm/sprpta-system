@@ -32,21 +32,25 @@ export type Count = { label: string; count: number };
 
 export type AreaTotal = { name: string; count: number; hasOfficer: boolean };
 
+// The registration message to the complainant. Messaging is not built yet, so a message is only ever "due".
 export type ForwardedCase = {
-  ref: string;
-  severity: Severity;
+  id: number;
+  ref: string | null;
+  severity: Severity | null;
   title: string;
-  area: string;
-  when: string;
-  message: "sent" | "none" | "failed"; // the registration message to the complainant
+  area: string | null;
+  when: string; // for example "10 min ago"
+  message: "due" | "none"; // a contact is on record, so a message is due once messaging is set up / no contact
 };
 
-export type L1DashboardData = {
+// The lower cards of the dashboard, from GET /api/l1/dashboard/overview: this officer's own work.
+export type DashboardOverview = {
+  monthTotal: number;
   sources: Count[]; // complaints this month by medium
-  busiestThisWeek: { medium: string; count: number; total: number };
-  lookup: { query: string; rows: { label: string; value: string }[] };
+  busiestWeek: { medium: string | null; count: number; total: number };
   areas: AreaTotal[]; // forwarded to each area officer this month
-  transport: { bus: number; trishaw: number };
+  forwardedTotal: number;
+  transport: { bus: number; trishaw: number; unknown: number };
   severity: { severity: Severity; count: number }[];
   forwarded: ForwardedCase[];
 };

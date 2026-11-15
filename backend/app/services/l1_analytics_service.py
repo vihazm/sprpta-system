@@ -1,6 +1,6 @@
 """Dashboard analytics: PostgreSQL aggregates over the officer's own complaints. Nothing is cached or hard-coded."""
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.core.enums import ComplaintStatus, DuplicateLinkType
@@ -43,7 +43,7 @@ def analytics(db: Session, officer: Principal) -> AnalyticsOut:
     return AnalyticsOut(
         total=db.scalar(select(count).where(mine)) or 0,
         by_category=_rows(db, ComplaintCategory.name, ComplaintCategory, Complaint.category_id == ComplaintCategory.id, mine, empty="No category"),
-        by_route=_rows(db, RouteStand.name, RouteStand, Complaint.route_stand_id == RouteStand.id, mine, TOP_ROUTES, "No route"),
+        by_route=_rows(db, RouteStand.name, RouteStand, Complaint.route_stand_id == RouteStand.id, and_(mine, Complaint.route_stand_id.is_not(None)), TOP_ROUTES, "No route"),  # a complaint with no route is not a route
         by_district=_rows(db, Area.name, Area, Complaint.area_id == Area.id, mine, empty="Not assigned yet"),
         by_month=by_month,
         duplicates=db.scalar(select(count).where(mine, Complaint.id.in_(duplicate))) or 0,

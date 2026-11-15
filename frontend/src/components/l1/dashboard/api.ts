@@ -1,6 +1,7 @@
 import { api, type ApiResult } from "@/lib/api-client";
 import { statusLabel } from "@/components/l1/status";
-import type { DashboardSummary, QueueKind, TargetFilter, WaitingCase } from "./types";
+import type { DashboardOverview, DashboardSummary, QueueKind, TargetFilter, WaitingCase } from "./types";
+import type { Severity } from "@/components/dashboard/severity";
 
 export type { TargetFilter } from "./types";
 
@@ -51,6 +52,54 @@ export async function loadDashboard(): Promise<ApiResult<DashboardSummary>> {
       title: p.subject ?? "No subject",
       complainant: p.complainant,
       ageMinutes: p.age_minutes,
+    })),
+  }));
+}
+
+// "10 min ago", "3 h ago", "2 d ago".
+function since(iso: string): string {
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 60 * 24) return `${Math.round(minutes / 60)} h ago`;
+  return `${Math.round(minutes / (60 * 24))} d ago`;
+}
+
+export async function loadOverview(): Promise<ApiResult<DashboardOverview>> {
+  const result = await api<{
+    month_total: number;
+    sources: { label: string; count: number }[];
+    busiest_week: { medium: string | null; count: number; total: number };
+    areas: { name: string; count: number; has_officer: boolean }[];
+    forwarded_total: number;
+    transport: { bus: number; trishaw: number; unknown: number };
+    severity: { severity: Severity; count: number }[];
+    forwarded: {
+      id: number;
+      reference_number: string | null;
+      title: string | null;
+      severity: Severity | null;
+      area_name: string | null;
+      forwarded_at: string;
+      has_contact: boolean;
+    }[];
+  }>("/api/l1/dashboard/overview");
+  return mapData(result, (b) => ({
+    monthTotal: b.month_total,
+    sources: b.sources,
+    busiestWeek: { medium: b.busiest_week.medium, count: b.busiest_week.count, total: b.busiest_week.total },
+    areas: b.areas.map((a) => ({ name: a.name, count: a.count, hasOfficer: a.has_officer })),
+    forwardedTotal: b.forwarded_total,
+    transport: b.transport,
+    severity: b.severity,
+    forwarded: b.forwarded.map((f) => ({
+      id: f.id,
+      ref: f.reference_number,
+      severity: f.severity,
+      title: f.title ?? "No subject",
+      area: f.area_name,
+      when: since(f.forwarded_at),
+      message: f.has_contact ? ("due" as const) : ("none" as const),
     })),
   }));
 }
