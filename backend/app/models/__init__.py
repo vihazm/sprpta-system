@@ -13,11 +13,14 @@ from app.models.complaint import (
     ImplementationRecord,
     SolutionDocument,
 )
+from app.models.duty_record import ComplaintDutySnapshot, DailyTrip, OwnerAssignment, TripDuty
 from app.models.health_check import HealthCheck
 from app.models.health_event import HealthEvent
 from app.models.master_data import (
     ComplaintCategory,
+    ComplaintCategoryTarget,
     ComplaintMedium,
+    ComplaintTargetType,
     Permit,
     Person,
     RouteStand,
@@ -41,7 +44,11 @@ __all__ = [
     "Complaint",
     "ComplaintAttachment",
     "ComplaintCategory",
+    "ComplaintCategoryTarget",
+    "ComplaintDutySnapshot",
     "ComplaintMedium",
+    "ComplaintTargetType",
+    "DailyTrip",
     "DuplicateCheck",
     "Escalation",
     "HealthCheck",
@@ -50,6 +57,7 @@ __all__ = [
     "MessageTemplate",
     "OtpCode",
     "OutboundMessage",
+    "OwnerAssignment",
     "Permit",
     "Person",
     "RatingAppeal",
@@ -59,6 +67,7 @@ __all__ = [
     "Severity",
     "SolutionDocument",
     "SystemSetting",
+    "TripDuty",
     "UsageLog",
     "User",
     "Vehicle",

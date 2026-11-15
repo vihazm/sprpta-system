@@ -11,9 +11,10 @@ the messaging module, which is not built yet.
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.enums import ComplaintStatus, DuplicateLinkType, RejectionType
+from app.core.enums import ComplaintStatus, DuplicateLinkType, PersonType, RejectionType
 from app.core.identifiers import normalise_identifier
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL
@@ -22,7 +23,10 @@ from app.models import (
     Complaint,
     ComplaintAttachment,
     ComplaintCategory,
+    ComplaintDutySnapshot,
+    ComplaintTargetType,
     ComplaintMedium,
+    DailyTrip,
     DuplicateCheck,
     Person,
     RouteStand,
@@ -33,17 +37,17 @@ from app.models import (
 from app.schemas.l1_complaints import (
     AttachmentOut,
     ComplaintForm,
-    ComplaintListItem,
     ComplaintOut,
     DuplicateCandidate,
+    DutySnapshotOut,
     RejectBody,
 )
 from app.services import audit_service
 from app.services import complaint_lookup_service as lookup
+from app.services.complaint_list_service import accused_status
 from app.services.auth_service import Principal
 
 EDITABLE = (ComplaintStatus.DRAFT, ComplaintStatus.INCOMPLETE)
-LIST_LIMIT = 100
 
 
 class ComplaintError(Exception):
@@ -59,12 +63,36 @@ class ComplaintError(Exception):
 # ---------------------------------------------------------------- reading
 
 
+def _duty_out(s: ComplaintDutySnapshot | None) -> DutySnapshotOut | None:
+    if s is None:
+        return None
+    return DutySnapshotOut(
+        trip_id=s.trip_id,
+        service_date=s.service_date,
+        bus_number=s.bus_number,
+        permit_number=s.permit_number,
+        route=s.route_name,
+        origin=s.origin,
+        destination=s.destination,
+        departure_time=s.departure_time,
+        owner_person_id=s.owner_person_id,
+        owner_name=s.owner_name,
+        driver_person_id=s.driver_person_id,
+        driver_name=s.driver_name,
+        conductor_person_id=s.conductor_person_id,
+        conductor_name=s.conductor_name,
+        verification_status=s.verification_status,
+    )
+
+
 def _out(db: Session, complaint: Complaint) -> ComplaintOut:
     vehicle = db.get(Vehicle, complaint.vehicle_id) if complaint.vehicle_id else None
     officer = db.get(User, complaint.assigned_l2_user_id) if complaint.assigned_l2_user_id else None
     area = db.get(Area, complaint.area_id) if complaint.area_id else None
     person = db.get(Person, complaint.subject_person_id) if complaint.subject_person_id else None
     earlier = db.get(Complaint, complaint.duplicate_of_complaint_id) if complaint.duplicate_of_complaint_id else None
+    snapshot = _snapshot_of(db, complaint)
+    target = db.get(ComplaintTargetType, complaint.target_type_id) if complaint.target_type_id else None
     attachments = db.scalars(
         select(ComplaintAttachment)
         .where(ComplaintAttachment.complaint_id == complaint.id, ComplaintAttachment.removed_at.is_(None))
@@ -77,15 +105,27 @@ def _out(db: Session, complaint: Complaint) -> ComplaintOut:
         medium_id=complaint.medium_id,
         is_anonymous=complaint.is_anonymous,
         complainant_name=complaint.complainant_name,
-        contact=complaint.contact_phone or complaint.contact_email,
+        mobile=complaint.contact_phone,
+        email=complaint.contact_email,
         complaint_date=complaint.complaint_date,
+        incident_time=complaint.incident_time,
+        incident_location=complaint.incident_location,
+        trip_id=snapshot.trip_id if snapshot else None,
+        duty=_duty_out(snapshot),
         vehicle_number=complaint.vehicle_number_entered,
         vehicle=lookup.vehicle_lookup(db, vehicle) if vehicle else None,
+        permit_id=complaint.permit_id,
+        owner_person_id=complaint.owner_person_id,
         subject_person_id=complaint.subject_person_id,
         subject_person_text=complaint.subject_person_text,
         subject_person_name=person.full_name if person else complaint.subject_person_text,
         route_stand_id=complaint.route_stand_id,
         category_id=complaint.category_id,
+        category_name=db.scalar(select(ComplaintCategory.name).where(ComplaintCategory.id == complaint.category_id)),
+        target_type_id=complaint.target_type_id,
+        target_code=target.code if target else None,
+        target_name=target.name if target else None,
+        accused_status=accused_status(complaint, target, snapshot),
         severity_id=complaint.severity_id,
         subject=complaint.subject,
         description=complaint.description,
@@ -130,25 +170,6 @@ def get_duplicates(db: Session, complaint_id: int) -> list[DuplicateCandidate]:
     return lookup.duplicate_candidates(db, find_complaint(db, complaint_id))
 
 
-def list_open(db: Session, status: ComplaintStatus | None) -> list[ComplaintListItem]:
-    """Drafts and incomplete complaints, to reopen and finish (UC-L1-06)."""
-    wanted = [status] if status in EDITABLE else list(EDITABLE)
-    rows = db.scalars(
-        select(Complaint).where(Complaint.status.in_(wanted)).order_by(Complaint.updated_at.desc()).limit(LIST_LIMIT)
-    )
-    return [
-        ComplaintListItem(
-            id=c.id,
-            reference_number=c.reference_number,
-            status=c.status,
-            subject=c.subject,
-            vehicle_number=c.vehicle_number_entered,
-            updated_at=c.updated_at,
-        )
-        for c in rows
-    ]
-
-
 # ---------------------------------------------------------------- saving the form
 
 
@@ -165,24 +186,96 @@ def must_exist(db: Session, model, row_id: int | None, label: str, *conditions) 
         raise ComplaintError(422, f"unknown_{label}", f"Choose a valid {label}.")
 
 
-def _contact(raw: str | None) -> tuple[str | None, str | None]:
-    """The phone and the email to store for what L1 typed in the contact box."""
+def _mobile(raw: str | None) -> str | None:
     raw = _clean(raw)
     if raw is None:
-        return None, None
+        return None
     parsed = normalise_identifier(raw)
-    if parsed is None:
-        raise ComplaintError(422, "invalid_contact", "Enter a valid email address or a Sri Lankan mobile number.")
-    kind, value = parsed
-    return (value, None) if kind == "phone" else (None, value)
+    if parsed is None or parsed[0] != "phone":
+        raise ComplaintError(422, "invalid_mobile", "Enter a valid Sri Lankan mobile number.")
+    return parsed[1]
 
 
-def _apply_form(db: Session, complaint: Complaint, data: ComplaintForm) -> None:
+def _email(raw: str | None) -> str | None:
+    raw = _clean(raw)
+    if raw is None:
+        return None
+    parsed = normalise_identifier(raw)
+    if parsed is None or parsed[0] != "email":
+        raise ComplaintError(422, "invalid_email", "Enter a valid email address.")
+    return parsed[1]
+
+
+def _snapshot_of(db: Session, complaint: Complaint) -> ComplaintDutySnapshot | None:
+    return db.scalar(select(ComplaintDutySnapshot).where(ComplaintDutySnapshot.complaint_id == complaint.id))
+
+
+def _keep_snapshot(
+    db: Session, principal: Principal, complaint: Complaint, snapshot: ComplaintDutySnapshot | None, trip_id: int
+) -> ComplaintDutySnapshot:
+    """The snapshot of the chosen daily record. A different record is read afresh and must be published."""
+    if snapshot is not None and snapshot.trip_id == trip_id:
+        return snapshot  # the same record as before: keep what was captured, even if it was withdrawn since
+
+    from app.services import bus_lookup_service  # imported here: it imports ComplaintError from this module
+
+    record = bus_lookup_service.trip_details(db, trip_id)
+    if snapshot is None:
+        snapshot = ComplaintDutySnapshot(complaint_id=complaint.id)
+        db.add(snapshot)
+    snapshot.trip_id = record.trip_id
+    snapshot.service_date = record.service_date
+    snapshot.bus_number = record.bus_number
+    snapshot.permit_number = record.permit_number
+    snapshot.route_name = record.route
+    snapshot.origin = record.origin
+    snapshot.destination = record.destination
+    snapshot.departure_time = record.departure_time
+    snapshot.owner_person_id, snapshot.owner_name = record.owner.person_id, record.owner.name
+    # Only people Admin verified are stored: an unverified or missing one stays empty, never guessed.
+    snapshot.driver_person_id, snapshot.driver_name = record.driver.person_id, record.driver.name
+    snapshot.conductor_person_id, snapshot.conductor_name = record.conductor.person_id, record.conductor.name
+    snapshot.verification_status = record.verification_status
+    db.flush()
+    audit_service.record(
+        db, principal, action="complaint.bus_selected", entity_type="complaints", entity_id=complaint.id,
+        complaint_id=complaint.id, details={"trip_id": trip_id, "bus_number": record.bus_number},
+    )
+    return snapshot
+
+
+# The kind of person each target names. A bus or service complaint names no person; Other may name anyone.
+_PERSON_FOR_TARGET = {"driver": PersonType.DRIVER, "conductor": PersonType.CONDUCTOR, "owner": PersonType.OWNER}
+
+
+def _check_target(db: Session, data: ComplaintForm) -> ComplaintTargetType | None:
+    """The target the complaint is against, after checking it fits the category and the person picked."""
+    if data.target_type_id is None:
+        return None
+    target = db.scalar(
+        select(ComplaintTargetType).where(ComplaintTargetType.id == data.target_type_id, ComplaintTargetType.is_active)
+    )
+    if target is None:
+        raise ComplaintError(422, "unknown_target", "Choose who the complaint is against.")
+    if data.category_id is not None and data.category_id not in {c.id for c in lookup.allowed_categories(db, target.id)}:
+        raise ComplaintError(422, "invalid_category", f"That issue category is not used for a {target.name.lower()} complaint.")
+    if target.code == "bus_service" and (data.subject_person_id is not None or _clean(data.subject_person_text)):
+        raise ComplaintError(422, "accused_not_allowed", "A complaint against the bus or service does not name a person.")
+    wanted = _PERSON_FOR_TARGET.get(target.code)
+    if wanted is not None and data.subject_person_id is not None:
+        person = db.get(Person, data.subject_person_id)
+        if person is None or person.person_type != wanted:
+            raise ComplaintError(422, "wrong_person_type", f"A {target.name.lower()} complaint needs a {wanted.value}.")
+    return target
+
+
+def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: ComplaintForm) -> None:
     must_exist(db, ComplaintMedium, data.medium_id, "medium", ComplaintMedium.is_system.is_(False))
     must_exist(db, ComplaintCategory, data.category_id, "category")
     must_exist(db, Severity, data.severity_id, "severity")
     must_exist(db, RouteStand, data.route_stand_id, "route_stand")
     must_exist(db, Person, data.subject_person_id, "person")
+    target = _check_target(db, data)
     if data.complaint_date and data.complaint_date > datetime.now(LOCAL).date():
         raise ComplaintError(422, "future_date", "The date cannot be in the future.")
 
@@ -191,34 +284,84 @@ def _apply_form(db: Session, complaint: Complaint, data: ComplaintForm) -> None:
         complaint.complainant_name = complaint.contact_phone = complaint.contact_email = None
     else:
         complaint.complainant_name = _clean(data.complainant_name)
-        complaint.contact_phone, complaint.contact_email = _contact(data.contact)
+        complaint.contact_phone = _mobile(data.mobile)
+        complaint.contact_email = _email(data.email)
 
     complaint.medium_id = data.medium_id
-    complaint.complaint_date = data.complaint_date
+    complaint.incident_time = data.incident_time
+    complaint.incident_location = _clean(data.incident_location)
     complaint.subject_person_id = data.subject_person_id
     complaint.subject_person_text = _clean(data.subject_person_text)
-    complaint.route_stand_id = data.route_stand_id
     complaint.category_id = data.category_id
+    complaint.target_type_id = target.id if target else None
     complaint.severity_id = data.severity_id
     complaint.subject = _clean(data.subject)
     complaint.description = _clean(data.description)
 
-    # The permit, owner and area come from the vehicle record, not from what L1 typed.
     number = _clean(data.vehicle_number)
-    vehicle = lookup.find_vehicle(db, number) if number else None
-    permit = lookup.active_permit(db, vehicle) if vehicle else None
+    snapshot = _snapshot_of(db, complaint)
+    if data.trip_id is None:
+        if snapshot is not None:  # the selected bus was cleared: its verified details go with it
+            db.delete(snapshot)
+            audit_service.record(
+                db, principal, action="complaint.bus_cleared", entity_type="complaints", entity_id=complaint.id,
+                complaint_id=complaint.id, details={"trip_id": snapshot.trip_id},
+            )
+        vehicle = lookup.find_vehicle(db, number) if number else None
+        permit = lookup.active_permit(db, vehicle) if vehicle else None
+        complaint.complaint_date = data.complaint_date
+        complaint.route_stand_id = data.route_stand_id
+        complaint.permit_id = permit.id if permit else None
+        complaint.owner_person_id = vehicle.owner_person_id if vehicle else None
+    else:
+        # The daily record decides the bus, permit, owner, route and incident date. None of them is read from the
+        # request, so nothing in it can pass as verified.
+        trip = db.get(DailyTrip, data.trip_id)
+        if trip is None:
+            raise ComplaintError(404, "trip_not_found", "That record is not available. Search again.")
+        snapshot = _keep_snapshot(db, principal, complaint, snapshot, trip.id)
+        vehicle = db.get(Vehicle, trip.vehicle_id)
+        typed = lookup.find_vehicle(db, number) if number else None
+        if typed is not None and typed.id != vehicle.id:
+            raise ComplaintError(422, "trip_mismatch", "The selected bus record is for another bus. Choose the bus again.")
+        number = vehicle.vehicle_number
+        complaint.complaint_date = trip.service_date
+        complaint.route_stand_id = trip.route_stand_id
+        complaint.permit_id = trip.permit_id
+        complaint.owner_person_id = snapshot.owner_person_id
+
     complaint.vehicle_number_entered = number
     complaint.vehicle_id = vehicle.id if vehicle else None
-    complaint.permit_id = permit.id if permit else None
-    complaint.owner_person_id = vehicle.owner_person_id if vehicle else None
     complaint.area_id = vehicle.registered_area_id if vehicle else None
 
 
+def _already_created(db: Session, principal: Principal, request_id: str | None) -> Complaint | None:
+    if request_id is None:
+        return None
+    return db.scalar(
+        select(Complaint).where(Complaint.entered_by_user_id == principal.id, Complaint.client_request_id == request_id)
+    )
+
+
 def create_draft(db: Session, principal: Principal, data: ComplaintForm) -> ComplaintOut:
-    complaint = Complaint(status=ComplaintStatus.DRAFT, entered_by_user_id=principal.id)
-    _apply_form(db, complaint, data)
+    """Save a new complaint as a draft. The complaint and its bus snapshot are saved together or not at all."""
+    earlier = _already_created(db, principal, data.client_request_id)
+    if earlier is not None:  # this save was sent before: hand back what it made
+        return _out(db, earlier)
+
+    complaint = Complaint(
+        status=ComplaintStatus.DRAFT, entered_by_user_id=principal.id, client_request_id=data.client_request_id
+    )
     db.add(complaint)
-    db.flush()  # gives the complaint its id for the audit row
+    try:
+        db.flush()  # gives the complaint its id for the snapshot and the audit row; a refused form rolls it back
+    except IntegrityError:  # the same save arrived twice at once, and the other one won
+        db.rollback()
+        earlier = _already_created(db, principal, data.client_request_id)
+        if earlier is None:
+            raise
+        return _out(db, earlier)
+    _apply_form(db, principal, complaint, data)
     audit_service.record(
         db, principal, action="complaint.create", entity_type="complaints", entity_id=complaint.id,
         complaint_id=complaint.id, to_status=ComplaintStatus.DRAFT,
@@ -227,12 +370,11 @@ def create_draft(db: Session, principal: Principal, data: ComplaintForm) -> Comp
     return _out(db, complaint)
 
 
-def update_complaint(db: Session, complaint_id: int, data: ComplaintForm) -> ComplaintOut:
+def update_complaint(db: Session, principal: Principal, complaint_id: int, data: ComplaintForm) -> ComplaintOut:
     complaint = find_editable(db, complaint_id)
-    _apply_form(db, complaint, data)
+    _apply_form(db, principal, complaint, data)
     db.commit()
     return _out(db, complaint)
-
 
 # ---------------------------------------------------------------- moving it on
 
@@ -272,6 +414,7 @@ def _missing_details(complaint: Complaint) -> list[str]:
         "a vehicle that is on record": complaint.vehicle_id,
         "route or stand": complaint.route_stand_id,
         "category": complaint.category_id,
+        "who the complaint is against": complaint.target_type_id,
         "severity": complaint.severity_id,
         "subject": complaint.subject,
         "description": complaint.description,

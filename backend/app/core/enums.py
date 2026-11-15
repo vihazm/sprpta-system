@@ -105,3 +105,11 @@ class RatingBand(StrEnum):
 class AppealStatus(StrEnum):
     OPEN = "open"
     RESOLVED = "resolved"
+
+
+class DutyRecordStatus(StrEnum):
+    """Daily operation records: only System Admin moves them on, and Level 1 sees only the published ones."""
+
+    DRAFT = "draft"
+    APPROVED = "approved"
+    PUBLISHED = "published"

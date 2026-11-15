@@ -69,6 +69,9 @@ EXPECTED_COLUMNS = {
         "route_stand_id", "area_id", "assigned_l2_user_id", "rejection_type", "rejection_reason",
         "duplicate_of_complaint_id", "registered_at", "forwarded_at", "review_started_at", "decided_at",
         "escalated_at", "done_at", "closed_at", "rejected_at", "paused_since", "paused_total", *TS,
+        "incident_time", "incident_location",  # added by migration 0005, for the Level 1 complaint form
+        "client_request_id",  # added by migration 0006, so that a retried save cannot create a second complaint
+        "target_type_id",  # added by migration 0007: who the complaint is against
     ],
     "complaint_attachments": [
         "id", "complaint_id", "file_name", "storage_path", "mime_type", "size_bytes", "description",
@@ -316,7 +319,7 @@ def test_complaints_have_the_documented_indexes(db):
     assert names == {
         "ix_complaints_status", "ix_complaints_area_status", "ix_complaints_l2_officer_status",
         "ix_complaints_vehicle", "ix_complaints_subject_person", "ix_complaints_complainant_account",
-        "ix_complaints_severity_registered",
+        "ix_complaints_severity_registered", "ix_complaints_entered_by_target",
     }
 
 

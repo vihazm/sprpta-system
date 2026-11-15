@@ -156,3 +156,35 @@ class ComplaintMedium(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+class ComplaintTargetType(Base):
+    """Who a complaint is against: Driver, Conductor, Bus owner, Bus / Transport service, Other.
+
+    Separate from who complained and from the issue category. The accused person, when one is identified, is
+    complaints.subject_person_id. Rows are switched off with is_active, never deleted.
+    """
+
+    __tablename__ = "complaint_target_types"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    code: Mapped[str] = mapped_column(Text, unique=True)  # driver, conductor, owner, bus_service, other
+    name: Mapped[str] = mapped_column(Text, unique=True)
+    sort_order: Mapped[int] = mapped_column(SmallInteger)
+    is_active: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ComplaintCategoryTarget(Base):
+    """An approved link between an issue category and a complaint target.
+
+    A target with no rows here shows every category. Once a target has rows, only those categories may be used
+    with it. Admin maintains the links; none are shipped, because none have been approved yet.
+    """
+
+    __tablename__ = "complaint_category_targets"
+
+    category_id: Mapped[int] = mapped_column(ForeignKey("complaint_categories.id"), primary_key=True)
+    target_type_id: Mapped[int] = mapped_column(ForeignKey("complaint_target_types.id"), primary_key=True)

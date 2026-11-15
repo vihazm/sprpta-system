@@ -10,6 +10,8 @@ from app.models import (
     Area,
     Complaint,
     ComplaintCategory,
+    ComplaintCategoryTarget,
+    ComplaintTargetType,
     ComplaintMedium,
     DuplicateCheck,
     Permit,
@@ -20,11 +22,13 @@ from app.models import (
 )
 from app.schemas.l1_complaints import (
     DuplicateCandidate,
+    CategoryOption,
     FormOptions,
     Named,
     PersonLookup,
     RouteStandOption,
     SeverityOption,
+    TargetOption,
     VehicleLookup,
 )
 
@@ -38,15 +42,41 @@ def form_options(db: Session) -> FormOptions:
         .where(ComplaintMedium.is_active, ComplaintMedium.is_system.is_(False))
         .order_by(ComplaintMedium.id)
     )
-    categories = db.scalars(select(ComplaintCategory).where(ComplaintCategory.is_active).order_by(ComplaintCategory.id))
     severities = db.scalars(select(Severity).where(Severity.is_active).order_by(Severity.rank))
     places = db.scalars(select(RouteStand).where(RouteStand.is_active).order_by(RouteStand.name))
     return FormOptions(
         mediums=[Named(id=m.id, name=m.name) for m in mediums],
-        categories=[Named(id=c.id, name=c.name) for c in categories],
+        categories=_categories(db),
+        targets=list_targets(db),
         severities=[SeverityOption(id=s.id, name=s.name, forward_days=s.forward_days) for s in severities],
         routes_stands=[RouteStandOption(id=p.id, name=p.name, kind=p.kind.value, area_id=p.area_id) for p in places],
     )
+
+
+def _categories(db: Session) -> list[CategoryOption]:
+    approved: dict[int, list[int]] = {}
+    for category_id, target_id in db.execute(select(ComplaintCategoryTarget.category_id, ComplaintCategoryTarget.target_type_id)):
+        approved.setdefault(category_id, []).append(target_id)
+    rows = db.scalars(select(ComplaintCategory).where(ComplaintCategory.is_active).order_by(ComplaintCategory.id))
+    return [CategoryOption(id=c.id, name=c.name, target_ids=approved.get(c.id, [])) for c in rows]
+
+
+def list_targets(db: Session) -> list[TargetOption]:
+    """Who a complaint can be against."""
+    rows = db.scalars(
+        select(ComplaintTargetType).where(ComplaintTargetType.is_active).order_by(ComplaintTargetType.sort_order)
+    )
+    return [TargetOption(id=t.id, name=t.name, code=t.code) for t in rows]
+
+
+def allowed_categories(db: Session, target_id: int | None) -> list[CategoryOption]:
+    """The issue categories open to a target. Where no mapping has been approved for it, that is every category."""
+    options = _categories(db)
+    if target_id is None:
+        return options
+    mapped = [c for c in options if target_id in c.target_ids]
+    has_mapping = db.scalar(select(ComplaintCategoryTarget.category_id).where(ComplaintCategoryTarget.target_type_id == target_id).limit(1))
+    return mapped if has_mapping is not None else options
 
 
 def find_vehicle(db: Session, number: str) -> Vehicle | None:
@@ -78,6 +108,7 @@ def vehicle_lookup(db: Session, vehicle: Vehicle) -> VehicleLookup:
         area_name=db.scalar(select(Area.name).where(Area.id == vehicle.registered_area_id)),
         permit_number=permit.permit_number if permit else None,
         owner_name=owner.full_name if owner else None,
+        owner_person_id=owner.id if owner else None,
         past_complaints=past or 0,
     )
 
