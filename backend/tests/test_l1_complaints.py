@@ -21,7 +21,7 @@ from app.models import (
     Vehicle,
 )
 from app.core.enums import PlaceKind
-from tests.conftest import make_user, sign_in
+from tests.conftest import make_user, sign_in, target_id
 
 URL = "/api/l1/complaints"
 TODAY = datetime.now(LOCAL).date().isoformat()
@@ -47,6 +47,8 @@ def lists(db, client, galle, tmp_path, monkeypatch) -> Lists:
     )
     owner = Person(full_name="Nimal Perera", person_type=PersonType.OWNER)
     data.route = RouteStand(kind=PlaceKind.ROUTE, name="Galle - Matara", area_id=galle.id)
+    data.owner = owner
+    data.driver_target = target_id(db, "driver")
     db.add_all([data.medium, data.portal, data.category, data.severity, data.route, owner])
     db.flush()
     data.vehicle = Vehicle(
@@ -66,10 +68,12 @@ def form(lists: Lists, **changes) -> dict:
         "medium_id": lists.medium.id,
         "is_anonymous": False,
         "complainant_name": "Kamala Fernando",
-        "contact": "0771234567",
+        "mobile": "0771234567",
+        "email": "Kamala@Example.lk",
         "complaint_date": TODAY,
         "vehicle_number": "sp nb-2345",
         "route_stand_id": lists.route.id,
+        "target_type_id": lists.driver_target,
         "category_id": lists.category.id,
         "severity_id": lists.severity.id,
         "subject": "Charged more than the fare",
@@ -123,6 +127,7 @@ def test_vehicle_lookup_ignores_case_spaces_and_hyphens_and_fills_in_the_record(
         "area_name": "Galle",
         "permit_number": "GL-BP-0101",
         "owner_name": "Nimal Perera",
+        "owner_person_id": lists.owner.id,
         "past_complaints": 0,
     }
     missing = client.get(f"{URL}/lookup/vehicle", params={"number": "XX 0000"})
@@ -145,7 +150,7 @@ def test_a_draft_takes_its_permit_owner_and_area_from_the_vehicle(client, db, li
     draft = new_draft(client, lists)
     assert draft["status"] == "draft"
     assert draft["reference_number"] is None
-    assert draft["contact"] == "+94771234567"
+    assert draft["mobile"] == "+94771234567" and draft["email"] == "kamala@example.lk"  # both normalised
     assert draft["vehicle"]["permit_number"] == "GL-BP-0101"
     assert draft["area_name"] == "Galle"
     row = db.get(Complaint, draft["id"])
@@ -174,12 +179,13 @@ def test_a_draft_can_be_saved_half_empty_and_an_unknown_vehicle_is_kept_as_typed
 
 def test_an_anonymous_complaint_keeps_no_name_and_no_contact(client, lists):
     draft = new_draft(client, lists, is_anonymous=True)
-    assert draft["complainant_name"] is None and draft["contact"] is None
+    assert draft["complainant_name"] is None and draft["mobile"] is None and draft["email"] is None
 
 
 def test_the_form_is_checked(client, lists):
     cases = {
-        "invalid_contact": {"contact": "not a contact"},
+        "invalid_mobile": {"mobile": "not a number"},
+        "invalid_email": {"email": "not an email"},
         "future_date": {"complaint_date": (date.today() + timedelta(days=2)).isoformat()},
         "unknown_medium": {"medium_id": 9999},
         "unknown_category": {"category_id": 9999},
@@ -212,9 +218,9 @@ def test_open_complaints_are_listed_to_finish_later(client, lists):
     client.put(f"{URL}/{forwarded['id']}/duplicates/{incomplete['id']}", json={"link_type": "not_duplicate"})
     assert client.post(f"{URL}/{forwarded['id']}/forward").status_code == 200
 
-    everything = client.get(URL).json()
-    assert {c["id"] for c in everything} == {draft["id"], incomplete["id"]}
-    only_incomplete = client.get(URL, params={"status": "incomplete"}).json()
+    everything = client.get(URL).json()["items"]
+    assert {c["id"] for c in everything} == {draft["id"], incomplete["id"], forwarded["id"]}  # the list shows every case
+    only_incomplete = client.get(URL, params={"status": "incomplete"}).json()["items"]
     assert [c["id"] for c in only_incomplete] == [incomplete["id"]]
 
 
@@ -494,3 +500,108 @@ def test_a_complaint_holds_at_most_ten_files(client, lists):
         assert client.post(uri, files={"file": ("a.png", PNG, "image/png")}).status_code == 201
     eleventh = client.post(uri, files={"file": ("a.png", b"x", "image/png")})
     assert eleventh.status_code == 409 and error_code(eleventh) == "too_many_files"
+
+def test_a_mobile_box_takes_only_a_mobile_and_an_email_box_only_an_email(client, lists):
+    swapped = client.post(URL, json=form(lists, mobile="kamala@example.lk", email="0771234567"))
+    assert swapped.status_code == 422 and error_code(swapped) == "invalid_mobile"
+    only_email = new_draft(client, lists, mobile=None)
+    assert only_email["mobile"] is None and only_email["email"] == "kamala@example.lk"
+
+
+def test_the_incident_time_and_location_are_stored(client, db, lists):
+    draft = new_draft(client, lists, incident_time="18:45", incident_location="  Galle bus stand ")
+    assert draft["incident_time"] == "18:45:00" and draft["incident_location"] == "Galle bus stand"
+    row = db.get(Complaint, draft["id"])
+    assert (row.incident_time.isoformat(), row.incident_location) == ("18:45:00", "Galle bus stand")
+    assert client.post(URL, json=form(lists, incident_time="25:99")).status_code == 422
+    assert client.post(URL, json=form(lists, incident_location="x" * 201)).status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "mime"),
+    [
+        ("voice.mp3", b"ID3\x04\x00\x00" + b"\x00" * 20, "audio/mpeg"),
+        ("voice.mp3", b"\xff\xfb\x90\x00" + b"\x00" * 20, "audio/mpeg"),
+        ("note.m4a", b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 20, "audio/x-m4a"),
+        ("note.wav", b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 20, "audio/wav"),
+        ("note.ogg", b"OggS\x00\x02" + b"\x00" * 20, "audio/ogg"),
+        ("clip.mp4", b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 20, "video/mp4"),
+        ("clip.mov", b"\x00\x00\x00\x14ftypqt  " + b"\x00" * 20, "video/quicktime"),
+        ("clip.webm", b"\x1a\x45\xdf\xa3" + b"\x00" * 20, "video/webm"),
+    ],
+)
+def test_audio_and_video_evidence_is_accepted_when_the_contents_fit(client, lists, name, content, mime):
+    uri = f"{URL}/{new_draft(client, lists)['id']}/attachments"
+    added = client.post(uri, files={"file": (name, content, mime)})
+    assert added.status_code == 201, added.text
+    assert added.json()["mime_type"] == mime
+
+
+def test_audio_and_video_are_checked_by_their_contents_and_their_own_size_limit(client, lists):
+    uri = f"{URL}/{new_draft(client, lists)['id']}/attachments"
+    fake = client.post(uri, files={"file": ("clip.mp4", b"not a video at all", "video/mp4")})
+    assert fake.status_code == 415 and error_code(fake) == "file_type_mismatch"
+    one_byte = client.post(uri, files={"file": ("a.mp3", b"\xff", "audio/mpeg")})
+    assert one_byte.status_code == 415  # too short to be audio, and no crash
+
+    big_audio = client.post(uri, files={"file": ("a.mp3", b"ID3" + b"x" * (25 * 1024 * 1024), "audio/mpeg")})
+    assert big_audio.status_code == 413 and error_code(big_audio) == "file_too_large"
+    ok_audio = client.post(uri, files={"file": ("b.mp3", b"ID3" + b"x" * (12 * 1024 * 1024), "audio/mpeg")})
+    assert ok_audio.status_code == 201  # over the 10 MB of a document, within the audio limit
+    big_doc = client.post(uri, files={"file": ("a.pdf", b"%PDF-" + b"x" * (10 * 1024 * 1024), "application/pdf")})
+    assert big_doc.status_code == 413
+
+
+# ---------------------------------------------------------------- possible duplicates: only close, recent ones block
+
+
+def _register(client, lists, subject):
+    earlier = new_draft(client, lists, subject=subject)
+    assert client.post(f"{URL}/{earlier['id']}/incomplete").status_code == 200  # issues its reference number
+    return earlier
+
+
+def test_only_a_close_match_has_to_be_decided_before_forwarding(client, db, lists):
+    close = _register(client, lists, "Rude driver at the stand")
+    weak = _register(client, lists, "Zebra quantum")
+    draft = new_draft(client, lists, subject="Rude driver at the stand today")
+    found = {c["id"]: c for c in client.get(f"{URL}/{draft['id']}/duplicates").json()}
+    assert found[close["id"]]["must_decide"] is True and found[close["id"]]["match"] >= 40
+    assert found[weak["id"]]["must_decide"] is False and found[weak["id"]]["match"] < 40  # shown, but optional
+
+    blocked = client.post(f"{URL}/{draft['id']}/forward")
+    assert blocked.status_code == 409 and error_code(blocked) == "duplicate_undecided"
+    client.put(f"{URL}/{draft['id']}/duplicates/{close['id']}", json={"link_type": "not_duplicate"})
+    assert client.post(f"{URL}/{draft['id']}/forward").status_code == 200  # the weak one was never decided
+
+
+def test_a_case_registered_long_ago_is_not_a_possible_duplicate(client, db, lists):
+    old = _register(client, lists, "Rude driver at the stand")
+    row = db.get(Complaint, old["id"])
+    row.registered_at = datetime.now(LOCAL) - timedelta(days=40)
+    db.commit()
+    draft = new_draft(client, lists, subject="Rude driver at the stand")
+    assert client.get(f"{URL}/{draft['id']}/duplicates").json() == []
+    assert client.post(f"{URL}/{draft['id']}/forward").status_code == 200
+
+    recent = _register(client, lists, "Rude driver at the stand")
+    again = new_draft(client, lists, subject="Rude driver at the stand")
+    ids = [c["id"] for c in client.get(f"{URL}/{again['id']}/duplicates").json()]
+    assert recent["id"] in ids and old["id"] not in ids  # the recent one counts, the 40-day-old one still does not
+
+
+# ---------------------------------------------------------------- the permit lookup
+
+
+def test_a_permit_number_finds_its_vehicle(client, db, lists):
+    for typed in ("GL-BP-0101", "gl-bp-0101", " GL-BP-0101 ", "GL-BP- 0101"):
+        found = client.get(f"{URL}/lookup/permit", params={"number": typed})
+        assert found.status_code == 200, typed
+        assert found.json()["vehicle_number"] == "SP NB-2345" and found.json()["permit_number"] == "GL-BP-0101"
+    missing = client.get(f"{URL}/lookup/permit", params={"number": "NOPE-1"})
+    assert missing.status_code == 404 and error_code(missing) == "permit_not_found"
+    assert client.get(f"{URL}/lookup/permit", params={"number": ""}).status_code == 422
+    assert client.get(f"{URL}/lookup/permit", params={"number": "A" * 41}).status_code == 422
+    assert client.get(f"{URL}/lookup/permit", params={"number": "%"}).status_code == 404  # not a wildcard
+    client.post("/api/auth/logout")
+    assert client.get(f"{URL}/lookup/permit", params={"number": "GL-BP-0101"}).status_code == 401

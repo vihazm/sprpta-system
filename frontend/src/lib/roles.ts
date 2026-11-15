@@ -64,10 +64,11 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
   implementing_staff: [{ label: "Case search", href: "/is/cases" }],
   l1: [
     { label: "Dashboard", href: "/l1/dashboard" },
-    { label: "Complaints" },
-    { label: "Portal submissions" },
+    { label: "My Complaints", href: "/l1/complaints" },
+    { label: "Portal submissions", href: "/l1/portal-submissions" },
     { label: "New complaint", href: "/l1/new-complaint" },
     { label: "New recommendation", href: "/l1/new-recommendation" },
+    { label: "Bus & permit lookup", href: "/l1/bus-lookup" },
   ],
   l2: [
     { label: "Dashboard", href: "/l2/dashboard" },

@@ -4,7 +4,7 @@ Statuses and their transitions are enforced by the backend and each one is
 written to audit_log. The checks below are a second line of defence.
 """
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import (
     BigInteger,
@@ -17,6 +17,7 @@ from sqlalchemy import (
     Index,
     Interval,
     Text,
+    Time,
     UniqueConstraint,
     false,
     func,
@@ -78,6 +79,28 @@ class Complaint(Base):
             "AND contact_email IS NULL)",
             name="anonymous_has_no_contact",
         ),
+        # A retried save of the same new complaint must not create a second one (see create_draft).
+        Index(
+            "uq_complaints_entered_by_client_request",
+            "entered_by_user_id",
+            "client_request_id",
+            unique=True,
+            postgresql_where=text("client_request_id IS NOT NULL"),
+        ),
+        Index("ix_complaints_entered_by_target", "entered_by_user_id", "target_type_id"),
+        Index("ix_complaints_complaint_date", "complaint_date"),
+        Index("ix_complaints_category", "category_id"),
+        Index("ix_complaints_duplicate_of", "duplicate_of_complaint_id"),
+        Index("ix_complaints_bus_verification", "bus_verification"),
+        CheckConstraint(
+            "complainant_type IS NULL OR complainant_type IN ('passenger', 'driver', 'conductor', 'owner', 'other')",
+            name="known_complainant_type",
+        ),
+        CheckConstraint(
+            "bus_verification IS NULL OR bus_verification IN "
+            "('verified', 'corrected', 'not_found', 'not_operated', 'trip_cancelled', 'unverified')",
+            name="known_bus_verification",
+        ),
         Index("ix_complaints_status", "status"),
         Index("ix_complaints_area_status", "area_id", "status"),
         Index("ix_complaints_l2_officer_status", "assigned_l2_user_id", "status"),
@@ -101,6 +124,15 @@ class Complaint(Base):
     contact_phone: Mapped[str | None] = mapped_column(Text)
     contact_email: Mapped[str | None] = mapped_column(Text)
     complaint_date: Mapped[date | None] = mapped_column(Date)  # incident or receipt date: still to be confirmed
+    incident_time: Mapped[time | None] = mapped_column(Time)  # only when it differs from the trip time
+    incident_location: Mapped[str | None] = mapped_column(Text)
+    # Who the complaint is against. Required to forward; a draft may leave it open.
+    target_type_id: Mapped[int | None] = mapped_column(ForeignKey("complaint_target_types.id"))
+    complainant_type: Mapped[str | None] = mapped_column(Text)  # passenger, driver, conductor, owner or other
+    # What checking the bus against the daily records found; the number as typed stays in vehicle_number_entered.
+    bus_verification: Mapped[str | None] = mapped_column(Text)
+    synthetic_batch_id: Mapped[int | None] = mapped_column(ForeignKey("synthetic_batches.id"))
+    client_request_id: Mapped[str | None] = mapped_column(Text)  # sent by the form once per new complaint, for safe retries
     subject: Mapped[str | None] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("complaint_categories.id"))
@@ -167,6 +199,7 @@ class DuplicateCheck(Base):
     __table_args__ = (
         UniqueConstraint("complaint_id", "candidate_complaint_id", name="uq_duplicate_checks_complaint_candidate"),
         CheckConstraint("complaint_id <> candidate_complaint_id", name="not_itself"),
+        Index("ix_duplicate_checks_candidate", "candidate_complaint_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)

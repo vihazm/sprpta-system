@@ -136,7 +136,7 @@ export function UserDirectory({ summary }: { summary: UsersSummary }) {
           ))}
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full border-separate border-spacing-y-1 text-[0.81rem]">
             <thead>
               <tr>

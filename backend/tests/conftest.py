@@ -127,3 +127,11 @@ def sign_in(client: TestClient, identifier: str, password: str = PASSWORD, **hea
     return client.post(
         "/api/auth/login", json={"identifier": identifier, "password": password}, headers=headers
     )
+
+def target_id(db, code: str) -> int:
+    """The id of a complaint target type (driver, conductor, owner, bus_service or other). The migration creates them."""
+    from sqlalchemy import select
+
+    from app.models import ComplaintTargetType
+
+    return db.scalar(select(ComplaintTargetType.id).where(ComplaintTargetType.code == code))
