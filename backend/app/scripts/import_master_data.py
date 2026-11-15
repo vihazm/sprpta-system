@@ -6,8 +6,8 @@
 Run the seed first (it creates the three areas). The workbook has three sheets:
 
 - Permits (Permit No, Bus No, Office, Route, Origin, Destination): becomes a vehicle (bus number, registered
-  in the office's area), its permit (DB doc 2.7) and a route for that area (DB doc 2.5). A permit is not linked
-  to its route: the permits table has no column for it.
+  in the office's area), its permit (DB doc 2.7) and a route for that area (DB doc 2.5). The permit records its
+  route (permits.route_stand_id); running the import again fills this in for permits stored before it existed.
 - Conductors and Drivers (Conductor/Driver Name, three address lines, City, Mobile): become people (DB doc 2.8). The mobile
   number is stored as +94...; the address has no column and is not stored.
 
@@ -133,7 +133,8 @@ def import_permits(db: Session, rows: list[list[str]], report: Report) -> None:
     vehicles = {v.vehicle_number: v for v in db.scalars(select(Vehicle))}
     permit_owner = {number: vehicle_id for number, vehicle_id in db.execute(select(Permit.permit_number, Permit.vehicle_id))}
     seen: set[str] = set()  # permit numbers met so far in this file
-    places = {(p.name, p.area_id) for p in db.scalars(select(RouteStand).where(RouteStand.kind == PlaceKind.ROUTE))}
+    places = {(p.name, p.area_id): p.id for p in db.scalars(select(RouteStand).where(RouteStand.kind == PlaceKind.ROUTE))}
+    stored_permits = {p.permit_number: p for p in db.scalars(select(Permit))}
 
     for line, (permit_no, bus, office, route, origin, destination) in enumerate(rows, start=2):
         area_id = areas.get(office.upper())
@@ -142,9 +143,12 @@ def import_permits(db: Session, rows: list[list[str]], report: Report) -> None:
 
         name = _route_name(route, origin, destination)
         if (name, area_id) not in places:
-            db.add(RouteStand(kind=PlaceKind.ROUTE, name=name, area_id=area_id))
-            places.add((name, area_id))
+            stand = RouteStand(kind=PlaceKind.ROUTE, name=name, area_id=area_id)
+            db.add(stand)
+            db.flush()
+            places[(name, area_id)] = stand.id
             report.created["routes"] += 1
+        route_id = places[(name, area_id)]
 
         number = _vehicle_number(bus)
         if not number:
@@ -168,11 +172,15 @@ def import_permits(db: Session, rows: list[list[str]], report: Report) -> None:
             continue
         seen.add(permit_no)
         if permit_no not in permit_owner:
-            db.add(Permit(permit_number=permit_no, vehicle_id=vehicle.id))
+            db.add(Permit(permit_number=permit_no, vehicle_id=vehicle.id, route_stand_id=route_id))
             permit_owner[permit_no] = vehicle.id
             report.created["permits"] += 1
         elif permit_owner[permit_no] == vehicle.id:
             report.existing["permits"] += 1  # stored by an earlier run
+            stored = stored_permits.get(permit_no)
+            if stored is not None and stored.route_stand_id is None:
+                stored.route_stand_id = route_id  # an earlier import did not record the permit's route
+                report.created["permit routes"] += 1
         else:
             report.skipped.append(
                 f"Permits row {line}: permit {permit_no} for {number} not added, "

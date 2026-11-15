@@ -61,6 +61,7 @@ class Person(Base):
     staff_number: Mapped[str | None] = mapped_column(Text)  # for SPRPTA staff
     phone: Mapped[str | None] = mapped_column(Text)
     team_label: Mapped[str | None] = mapped_column(Text)
+    synthetic_batch_id: Mapped[int | None] = mapped_column(ForeignKey("synthetic_batches.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -97,6 +98,8 @@ class Permit(Base):
     permit_number: Mapped[str] = mapped_column(Text, unique=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     holder_person_id: Mapped[int | None] = mapped_column(ForeignKey("people.id"))
+    # The route this permit is for, from the permit workbook. Empty until the workbook is imported again.
+    route_stand_id: Mapped[int | None] = mapped_column(ForeignKey("routes_stands.id"))
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=true())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

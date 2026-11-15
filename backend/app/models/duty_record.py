@@ -42,6 +42,9 @@ class DailyTrip(Base):
         Index("ix_daily_trips_vehicle_date", "vehicle_id", "service_date"),
         Index("ix_daily_trips_date_status", "service_date", "status"),
         Index("ix_daily_trips_created_by_date", "created_by_user_id", "service_date"),
+        Index("ix_daily_trips_route_date", "route_stand_id", "service_date"),
+        CheckConstraint("trip_status IN ('completed', 'cancelled', 'partial')", name="known_trip_status"),
+        CheckConstraint("direction IS NULL OR direction IN ('outbound', 'return')", name="known_direction"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
@@ -55,6 +58,12 @@ class DailyTrip(Base):
     end_time: Mapped[time | None] = mapped_column(Time)
     remarks: Mapped[str | None] = mapped_column(Text)
     owner_person_id: Mapped[int | None] = mapped_column(ForeignKey("people.id"))  # the owner as the record states it
+    # How the trip went, apart from the record's publication status below. A cancelled trip never ran.
+    trip_status: Mapped[str] = mapped_column(Text, server_default="completed")
+    direction: Mapped[str | None] = mapped_column(Text)  # outbound or return
+    actual_departure: Mapped[time | None] = mapped_column(Time)
+    actual_arrival: Mapped[time | None] = mapped_column(Time)
+    synthetic_batch_id: Mapped[int | None] = mapped_column(ForeignKey("synthetic_batches.id"))  # set: simulated, not real
     status: Mapped[DutyRecordStatus] = mapped_column(DutyRecordStatusType, server_default="draft")
     created_by_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     approved_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
@@ -77,6 +86,8 @@ class TripDuty(Base):
     __tablename__ = "trip_duties"
     __table_args__ = (
         CheckConstraint("(verified_by_user_id IS NULL) = (verified_at IS NULL)", name="verification_complete"),
+        Index("ix_trip_duties_driver", "driver_person_id"),
+        Index("ix_trip_duties_conductor", "conductor_person_id"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
@@ -106,9 +117,11 @@ class OwnerAssignment(Base):
         Index("ix_owner_assignments_vehicle_from", "vehicle_id", "valid_from"),
     )
 
+
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"))
     owner_person_id: Mapped[int] = mapped_column(ForeignKey("people.id"))
+    synthetic_batch_id: Mapped[int | None] = mapped_column(ForeignKey("synthetic_batches.id"))
     valid_from: Mapped[date] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
     status: Mapped[DutyRecordStatus] = mapped_column(DutyRecordStatusType, server_default="draft")

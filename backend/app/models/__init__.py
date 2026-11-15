@@ -31,6 +31,7 @@ from app.models.messaging import MessageTemplate, OutboundMessage
 from app.models.otp_code import OtpCode
 from app.models.rating import RatingAppeal, RatingSnapshot
 from app.models.recommendation import Recommendation
+from app.models.synthetic import BusNonOperation, RouteAuthorization, SyntheticBatch, SyntheticComplaintEvent
 from app.models.system_setting import SystemSetting
 from app.models.usage_log import UsageLog
 from app.models.user import User
@@ -39,6 +40,7 @@ __all__ = [
     "Area",
     "AuditLog",
     "AuthSession",
+    "BusNonOperation",
     "CaseDecision",
     "ComplainantAccount",
     "Complaint",
@@ -63,9 +65,12 @@ __all__ = [
     "RatingAppeal",
     "RatingSnapshot",
     "Recommendation",
+    "RouteAuthorization",
     "RouteStand",
     "Severity",
     "SolutionDocument",
+    "SyntheticBatch",
+    "SyntheticComplaintEvent",
     "SystemSetting",
     "TripDuty",
     "UsageLog",

@@ -56,8 +56,8 @@ EXPECTED_COLUMNS = {
     "otp_codes": ["id", "complainant_account_id", "channel", "code_hash", "expires_at", "attempts", "consumed_at", "created_at"],
     "routes_stands": ["id", "kind", "name", "area_id", "is_active", *TS],
     "vehicles": ["id", "vehicle_number", "vehicle_type", "registered_area_id", "owner_person_id", "is_active", *TS],
-    "permits": ["id", "permit_number", "vehicle_id", "holder_person_id", "is_active", *TS],
-    "people": ["id", "full_name", "person_type", "staff_number", "phone", "team_label", "is_active", *TS],
+    "permits": ["id", "permit_number", "vehicle_id", "holder_person_id", "is_active", *TS, "route_stand_id"],
+    "people": ["id", "full_name", "person_type", "staff_number", "phone", "team_label", "is_active", *TS, "synthetic_batch_id"],
     "complaint_categories": ["id", "name", "description", "is_active", *TS],
     "severities": ["id", "name", "rank", "forward_days", "decide_days", "close_days", "rating_weight", "is_active", *TS],
     "complaint_mediums": ["id", "name", "is_system", "is_active", *TS],
@@ -72,6 +72,7 @@ EXPECTED_COLUMNS = {
         "incident_time", "incident_location",  # added by migration 0005, for the Level 1 complaint form
         "client_request_id",  # added by migration 0006, so that a retried save cannot create a second complaint
         "target_type_id",  # added by migration 0007: who the complaint is against
+        "complainant_type", "bus_verification", "synthetic_batch_id",  # added by migration 0009
     ],
     "complaint_attachments": [
         "id", "complaint_id", "file_name", "storage_path", "mime_type", "size_bytes", "description",
@@ -320,6 +321,7 @@ def test_complaints_have_the_documented_indexes(db):
         "ix_complaints_status", "ix_complaints_area_status", "ix_complaints_l2_officer_status",
         "ix_complaints_vehicle", "ix_complaints_subject_person", "ix_complaints_complainant_account",
         "ix_complaints_severity_registered", "ix_complaints_entered_by_target",
+        "ix_complaints_complaint_date", "ix_complaints_category", "ix_complaints_duplicate_of", "ix_complaints_bus_verification",
     }
 
 
