@@ -13,11 +13,14 @@ type DashboardState = {
 
 const DashboardContext = createContext<DashboardState>({ data: null, error: null, loading: false, refresh: () => {} });
 
-/** Loads the dashboard numbers once, and again whenever something calls refresh(). */
-export function DashboardProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<DashboardSummary | null>(null);
+/**
+ * Holds the dashboard numbers, and reads them again whenever something calls refresh(). `initial` are the
+ * numbers the server read while building the page; without them they are read here, in the browser.
+ */
+export function DashboardProvider({ initial, children }: { initial?: DashboardSummary; children: ReactNode }) {
+  const [data, setData] = useState<DashboardSummary | null>(initial ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const latest = useRef(0); // only the newest answer is used, whatever order they arrive in
 
   const refresh = useCallback(() => {
@@ -35,8 +38,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    if (!initial) refresh();
+  }, [refresh, initial]);
 
   const value = useMemo(() => ({ data, error, loading, refresh }), [data, error, loading, refresh]);
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;

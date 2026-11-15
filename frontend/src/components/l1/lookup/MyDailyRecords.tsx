@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { inputClass } from "@/components/dashboard/controls";
 import { Icon } from "@/components/dashboard/icons";
 import { Note } from "@/components/dashboard/Note";
@@ -12,13 +12,25 @@ const th = "px-2.5 py-1 text-left text-[0.69rem] font-bold uppercase tracking-[0
 
 // The daily records this officer entered, newest first, with what stage each is at. Open one to view or edit it
 // while it is still pending. `refresh` changes whenever a record is saved, so the list reloads.
-export function MyDailyRecords({ refresh, onOpen }: { refresh: number; onOpen: (id: number) => void }) {
+// `initial` is the first page, loaded on the server together with the page.
+export function MyDailyRecords({
+  refresh,
+  onOpen,
+  initial,
+}: {
+  refresh: number;
+  onOpen: (id: number) => void;
+  initial?: DailyRecordPage;
+}) {
   const [typed, setTyped] = useState("");
   const [search, setSearch] = useState("");
   const [date, setDate] = useState("");
   const [page, setPage] = useState(1);
-  const [answer, setAnswer] = useState<{ key: string; page?: DailyRecordPage; error?: string } | null>(null);
   const key = `${search}|${date}|${page}|${refresh}`;
+  const [answer, setAnswer] = useState<{ key: string; page?: DailyRecordPage; error?: string } | null>(
+    initial ? { key, page: initial } : null,
+  );
+  const firstPageShown = useRef(initial !== undefined);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -29,6 +41,10 @@ export function MyDailyRecords({ refresh, onOpen }: { refresh: number; onOpen: (
   }, [typed]);
 
   useEffect(() => {
+    if (firstPageShown.current) {
+      firstPageShown.current = false;
+      return;
+    }
     let current = true;
     void listDailyRecords({ date, search, page }).then((result) => {
       if (current) setAnswer(result.ok ? { key, page: result.data } : { key, error: result.message });

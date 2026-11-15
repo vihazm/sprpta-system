@@ -20,10 +20,11 @@ const blank: RecommendationFields = { kind: "commendation", details: "", mediumI
 
 // A suggestion to improve the service, or praise for a person (UC-L1-11). Used by the dashboard
 // and by the full New recommendation page. L1 cannot open a recommendation again after saving it.
-export function RecommendationForm({ className = "" }: { className?: string }) {
+// `initialMediums` are the ways a recommendation can reach SPRPTA, read together with the page.
+export function RecommendationForm({ className = "", initialMediums }: { className?: string; initialMediums?: Option[] }) {
   const [values, setValues] = useState<RecommendationFields>(blank);
   const [personName, setPersonName] = useState("");
-  const [mediums, setMediums] = useState<Option[]>([]);
+  const [mediums, setMediums] = useState<Option[]>(initialMediums ?? []);
   const [busy, setBusy] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [formKey, setFormKey] = useState(0); // remounts the choice buttons after a save
@@ -31,15 +32,17 @@ export function RecommendationForm({ className = "" }: { className?: string }) {
   useEffect(() => {
     let current = true;
     (async () => {
-      const lists = await loadOptions();
-      if (!current) return;
-      if (lists.ok) setMediums(lists.data.mediums);
+      if (!initialMediums) {
+        const lists = await loadOptions();
+        if (!current) return;
+        if (lists.ok) setMediums(lists.data.mediums);
+      }
       setValues((v) => ({ ...v, date: v.date || today() }));
     })();
     return () => {
       current = false;
     };
-  }, []);
+  }, [initialMediums]);
 
   function set<K extends keyof RecommendationFields>(key: K, value: RecommendationFields[K]) {
     setConfirmed(false);

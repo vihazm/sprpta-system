@@ -2,11 +2,12 @@
 
 import { Card, muted } from "@/components/dashboard/ui";
 import { ComplaintForm } from "@/components/l1/entry/ComplaintForm";
+import type { FormOptions } from "@/components/l1/entry/types";
 import { useDashboard } from "./DashboardData";
 
 // Entering a complaint that arrived by any medium (UC-L1-01 to UC-L1-10), all in one place. The dashboard's numbers
 // are read again after each save, so the queues and Your day so far stay true.
-export function QuickEntry({ className = "" }: { className?: string }) {
+export function QuickEntry({ className = "", options }: { className?: string; options?: FormOptions }) {
   const { refresh } = useDashboard();
   return (
     <Card className={`gap-4 ${className}`}>
@@ -16,7 +17,7 @@ export function QuickEntry({ className = "" }: { className?: string }) {
           Every detail of a complaint in one place. Details filled in from the records are shown in green.
         </p>
       </div>
-      <ComplaintForm layout="quick" onChanged={refresh} />
+      <ComplaintForm layout="quick" onChanged={refresh} initialOptions={options} />
     </Card>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, Chip, StatusDot, muted } from "@/components/dashboard/ui";
 import { AreaCoverage } from "./AreaCoverage";
 import { Collapse } from "./Collapse";
@@ -31,7 +31,7 @@ type Panel = { key: number; user: StaffUser | null; preset?: Preset };
 
 // The directory table, and beside it a column that holds the two boxes. When the form
 // opens, the boxes shrink to a strip and the form slides in below it.
-export function UserDirectory({ summary }: { summary: UsersSummary }) {
+export function UserDirectory({ summary, initial }: { summary: UsersSummary; initial?: UserPage }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState(""); // the query, once typing has paused
@@ -39,7 +39,7 @@ export function UserDirectory({ summary }: { summary: UsersSummary }) {
   const [role, setRole] = useState<StaffRole | "all">("all");
   const [page, setPage] = useState(1);
   const [reload, setReload] = useState(0); // bumped to fetch the table again after a change
-  const [data, setData] = useState<UserPage | null>(null);
+  const [data, setData] = useState<UserPage | null>(initial ?? null); // the first page, read with the page
   const [loadError, setLoadError] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [open, setOpen] = useState(false);
@@ -52,7 +52,12 @@ export function UserDirectory({ summary }: { summary: UsersSummary }) {
     return () => clearTimeout(timer);
   }, [query]);
 
+  const firstPageShown = useRef(initial !== undefined);
   useEffect(() => {
+    if (firstPageShown.current) {
+      firstPageShown.current = false; // the page already came with its first page
+      return;
+    }
     let current = true;
     loadUsers({ search, status, role, page }).then((result) => {
       if (!current) return; // a newer request has replaced this one

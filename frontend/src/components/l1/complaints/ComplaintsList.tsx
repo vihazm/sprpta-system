@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { inputClass } from "@/components/dashboard/controls";
 import { Icon } from "@/components/dashboard/icons";
 import { Note } from "@/components/dashboard/Note";
@@ -67,6 +67,7 @@ export function ComplaintsList({
   fixed = false,
   emptyText,
   notice,
+  initial,
 }: {
   title: string;
   subtitle: string;
@@ -81,12 +82,16 @@ export function ComplaintsList({
   fixed?: boolean;
   emptyText: string;
   notice?: string;
+  initial?: ComplaintPage; // the first view, read together with the page, so it needs no request of its own
 }) {
   const [typed, setTyped] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [answer, setAnswer] = useState<{ key: string; page?: ComplaintPage; error?: string } | null>(null);
   const key = `${filter}|${target}|${scope}|${categoryId}|${verification}|${search}|${page}`;
+  const [answer, setAnswer] = useState<{ key: string; page?: ComplaintPage; error?: string } | null>(
+    initial ? { key, page: initial } : null,
+  );
+  const firstViewShown = useRef(initial !== undefined);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -97,6 +102,10 @@ export function ComplaintsList({
   }, [typed]);
 
   useEffect(() => {
+    if (firstViewShown.current) {
+      firstViewShown.current = false;
+      return;
+    }
     let current = true;
     void listComplaints({ status: filter, target, scope, categoryId, verification, search, page }).then((result) => {
       if (!current) return;

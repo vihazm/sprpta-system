@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { PortalFrame } from "@/components/portal/PortalFrame";
+import { PortalShell } from "@/components/portal/PortalShell";
 
 // Level 2 area officer area. Everything under /l2 requires the "l2" role.
 export default function L2Layout({ children }: { children: ReactNode }) {
-  return <PortalFrame role="l2">{children}</PortalFrame>;
+  return <PortalShell role="l2">{children}</PortalShell>;
 }

@@ -1,25 +1,18 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import type { ComplaintFilter, TargetFilter } from "@/components/l1/dashboard/api";
+import type { ComplaintFilter, ComplaintPage, TargetFilter } from "@/components/l1/dashboard/api";
 import { ComplaintsList } from "./ComplaintsList";
-
-const FILTERS: ComplaintFilter[] = ["draft", "incomplete", "submitted", "forwarded", "rejected", "duplicates"];
-const TARGETS: TargetFilter[] = ["driver", "conductor", "owner", "bus_service", "other", "unclassified"];
+import { readComplaintsQuery } from "./query";
 
 // My Complaints: the complaints this officer registered. The filters live in the address
 // (/l1/complaints?target=driver&status=draft), so the dashboard cards can open a filtered view and the view can be
 // shared or reloaded. scope=all shows the whole Level 1 queue, which the dashboard's queue cards open.
-export function ComplaintsPage() {
+// `initial` is the first view, loaded on the server together with the page.
+export function ComplaintsPage({ initial }: { initial?: ComplaintPage }) {
   const router = useRouter();
   const params = useSearchParams();
-  const filter = FILTERS.find((f) => f === params.get("status")) ?? null;
-  const target = TARGETS.find((t) => t === params.get("target")) ?? null;
-  const scope = params.get("scope") === "all" ? "all" : "mine";
-  const verification = params.get("verification") === "failed" || params.get("verification") === "non_operating"
-    ? (params.get("verification") as "failed" | "non_operating")
-    : null;
-  const categoryId = /^[1-9]\d{0,9}$/.test(params.get("category_id") ?? "") ? Number(params.get("category_id")) : null;
+  const { filter, target, scope, verification, categoryId } = readComplaintsQuery((name) => params.get(name));
 
   function open(next: { status?: ComplaintFilter | null; target?: TargetFilter | null }) {
     const query = new URLSearchParams();
@@ -50,6 +43,7 @@ export function ComplaintsPage() {
       verification={verification}
       onClearFilter={() => router.replace("/l1/complaints")}
       emptyText="No complaints here yet."
+      initial={initial}
     />
   );
 }
