@@ -104,6 +104,15 @@ cd backend
 
 The tests use a separate `sprpta_test` database (created automatically) and never touch `sprpta_db`.
 
+## Building a page
+
+Every signed-in page loads its data while it is built and shows a skeleton until then, so moving between pages feels immediate.
+
+- **Data:** read it in a server component (`await loadSomething()`), using the same functions the browser uses (`lib/api-client.ts` picks the right transport), and pass the result to the client component as an `initial` prop. The component then only reads again when something changes.
+- **Skeleton:** add one to `components/portal/PageSkeletons.tsx` that follows the page's layout, and use it as the fallback:
+  `<Suspense fallback={<MySkeleton />}><Reveal><MyContent /></Reveal></Suspense>`.
+- **Frame:** the header and side menu come from `PortalShell` in the role's layout and never wait for a page. Anything that reads the session or cookies must sit behind a `Suspense`.
+
 ## Contributing
 
 - Nobody pushes to `main` or `dev`.

@@ -119,13 +119,18 @@ export function ComplaintForm({
   tripId,
   layout = "page",
   onChanged,
+  initialOptions,
 }: {
   complaintId?: number;
   tripId?: number;
+  initialOptions?: FormOptions; // the lists the form offers, read with the page; not used when continuing a saved case
   layout?: "page" | "quick"; // quick keeps the dashboard card's four numbered sections
   onChanged?: () => void; // called after something was saved or sent, so the page can refresh its numbers
 }) {
-  const [options, setOptions] = useState<FormOptions | null>(null);
+  // A new complaint starts with the lists the page already loaded. One that continues a saved case or a daily record
+  // waits for those too, so the form never shows empty before it is filled in.
+  const seeded = complaintId || tripId ? undefined : initialOptions;
+  const [options, setOptions] = useState<FormOptions | null>(seeded ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [values, setValues] = useState<ComplaintFields>(blank);
   const [saved, setSaved] = useState<SavedComplaint | null>(null);
@@ -196,7 +201,7 @@ export function ComplaintForm({
     let current = true;
     (async () => {
       const [lists, existing, trip] = await Promise.all([
-        loadOptions(),
+        seeded ? { ok: true as const, data: seeded } : loadOptions(),
         complaintId ? loadComplaint(complaintId) : null,
         tripId ? loadTrip(tripId) : null,
       ]);
@@ -218,7 +223,7 @@ export function ComplaintForm({
     return () => {
       current = false;
     };
-  }, [complaintId, tripId]);
+  }, [complaintId, tripId, seeded]);
 
   function set<K extends keyof ComplaintFields>(key: K, value: ComplaintFields[K]) {
     setValues((v) => ({ ...v, [key]: value }));

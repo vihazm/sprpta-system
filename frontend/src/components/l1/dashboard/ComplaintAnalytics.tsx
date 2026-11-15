@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Note } from "@/components/dashboard/Note";
 import { Card, CardHeading, bigNumber, eyebrow, muted } from "@/components/dashboard/ui";
 import { loadAnalytics, type Analytics, type CountRow } from "./api";
@@ -49,10 +49,15 @@ const rowsOf = (rows: CountRow[], link?: (r: CountRow) => string | undefined) =>
 
 // Complaints by issue category, route, district and month, plus the counts that need attention. Every number is a
 // PostgreSQL aggregate over this officer's own complaints; the tiles and categories open My Complaints, filtered.
-export function ComplaintAnalytics({ className = "" }: { className?: string }) {
-  const [state, setState] = useState<{ data?: Analytics; error?: string } | null>(null);
+export function ComplaintAnalytics({ className = "", initial }: { className?: string; initial?: Analytics }) {
+  const [state, setState] = useState<{ data?: Analytics; error?: string } | null>(initial ? { data: initial } : null);
+  const firstShown = useRef(initial !== undefined); // the page came with these already
 
   useEffect(() => {
+    if (firstShown.current) {
+      firstShown.current = false;
+      return;
+    }
     let current = true;
     void loadAnalytics().then((result) => {
       if (current) setState(result.ok ? { data: result.data } : { error: result.message });

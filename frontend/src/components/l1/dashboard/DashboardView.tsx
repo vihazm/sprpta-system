@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatToday, greeting } from "@/components/dashboard/dates";
 import { DashboardHero, HeroButton } from "@/components/dashboard/DashboardHero";
 import { Icon } from "@/components/dashboard/icons";
-import { loadOverview } from "./api";
+import type { FormOptions } from "@/components/l1/entry/types";
+import { loadOverview, type Analytics } from "./api";
 import { useDashboard } from "./DashboardData";
 import { ComplaintSources } from "./ComplaintSources";
 import { ComplaintAnalytics } from "./ComplaintAnalytics";
@@ -24,9 +25,14 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 // The lower cards (sources, passed to Level 2, transport and severity, recently forwarded). They are read again
 // whenever the dashboard numbers are, for example after a complaint was forwarded.
-function useOverview(trigger: unknown): DashboardOverview | undefined {
-  const [overview, setOverview] = useState<DashboardOverview>();
+function useOverview(trigger: unknown, initial?: DashboardOverview): DashboardOverview | undefined {
+  const [overview, setOverview] = useState<DashboardOverview | undefined>(initial);
+  const firstShown = useRef(initial !== undefined); // the page came with these already
   useEffect(() => {
+    if (firstShown.current) {
+      firstShown.current = false;
+      return;
+    }
     let current = true;
     void loadOverview().then((result) => {
       if (current && result.ok) setOverview(result.data);
@@ -40,9 +46,12 @@ function useOverview(trigger: unknown): DashboardOverview | undefined {
 
 // The Level 1 office staff landing page (UC-L1-12). Every figure and card is live: PostgreSQL aggregates over the
 // signed-in officer's own complaints, and the shared Level 1 queues.
-export function DashboardView({ name }: { name: string }) {
+// `initial` is what the server read while building the page; whatever is missing is read here in the browser.
+export type DashboardInitial = { overview?: DashboardOverview; analytics?: Analytics; options?: FormOptions };
+
+export function DashboardView({ name, initial }: { name: string; initial: DashboardInitial }) {
   const { data, error, loading, refresh } = useDashboard();
-  const overview = useOverview(data);
+  const overview = useOverview(data, initial.overview);
   const now = new Date();
 
   const waiting = data ? data.queues.drafts + data.queues.incomplete : 0;
@@ -88,7 +97,7 @@ export function DashboardView({ name }: { name: string }) {
       />
 
       <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">
-        <QuickEntry className="min-[1200px]:col-span-8" />
+        <QuickEntry className="min-[1200px]:col-span-8" options={initial.options} />
         <div className="flex min-w-0 flex-col gap-4 min-[1200px]:col-span-4">
           <NeedsAttention summary={data} error={error} onRetry={refresh} />
           <PortalQueue
@@ -100,9 +109,9 @@ export function DashboardView({ name }: { name: string }) {
         </div>
 
         <ComplaintsByTarget counts={data?.byTarget} className="min-[1200px]:col-span-12" />
-        <ComplaintAnalytics className="min-[1200px]:col-span-12" />
+        <ComplaintAnalytics className="min-[1200px]:col-span-12" initial={initial.analytics} />
 
-        <RecommendationForm className="min-[1200px]:col-span-4" />
+        <RecommendationForm className="min-[1200px]:col-span-4" initialMediums={initial.options?.mediums} />
         <ComplaintSources
           sources={overview?.sources}
           busiest={overview?.busiestWeek}
