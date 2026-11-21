@@ -114,10 +114,9 @@ const l1Dashboard: Cell[] = [
 ];
 
 const l2Dashboard: Cell[] = [
-  [8, "min-h-[28rem]"], [4, "min-h-[28rem]"],
+  [12, "min-h-[7rem]"],
+  [8, "min-h-[36rem]"], [4, "min-h-[36rem]"],
   [4, "min-h-[16rem]"], [4, "min-h-[16rem]"], [4, "min-h-[16rem]"],
-  [4, "min-h-[16rem]"], [4, "min-h-[16rem]"], [4, "min-h-[16rem]"],
-  [12, "min-h-[12rem]"],
 ];
 
 const l3Dashboard: Cell[] = [
@@ -159,3 +158,17 @@ export function BusLookupSkeleton() {
 export const NewComplaintSkeleton = () => <FormCard rows={6} />;
 
 export const RecommendationSkeleton = () => <FormCard rows={3} className="max-w-[44rem]" />;
+
+// ---------------------------------------------------------------- Level 2 screens
+
+export const CasesSkeleton = () => <TableCard />;
+export const RecommendationsSkeleton = () => <TableCard rows={6} />;
+
+export function CaseReviewSkeleton() {
+  return (
+    <div className={stack}>
+      <SkeletonCard height="min-h-[9rem]" />
+      <SkeletonGrid cells={[[8, "min-h-[30rem]"], [4, "min-h-[30rem]"]]} />
+    </div>
+  );
+}

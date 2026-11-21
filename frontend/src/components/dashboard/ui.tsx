@@ -69,13 +69,16 @@ export function CardHeading({
   );
 }
 
-// A text link such as "See all". The screens it opens are still to be built.
-export function LinkButton({ children }: { children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      className="focus-ring cursor-pointer whitespace-nowrap text-[0.78rem] font-extrabold text-crimson-hover hover:underline"
-    >
+// A text link such as "See all". With an href it opens that screen; without one, its screen is still to be built.
+export function LinkButton({ children, href }: { children: ReactNode; href?: string }) {
+  const className =
+    "focus-ring cursor-pointer whitespace-nowrap text-[0.78rem] font-extrabold text-crimson-hover hover:underline";
+  return href ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <button type="button" className={className}>
       {children}
     </button>
   );
