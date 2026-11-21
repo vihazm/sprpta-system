@@ -41,8 +41,14 @@ export function DashboardHero({
         <p className="text-[0.69rem] font-bold uppercase tracking-[0.1em] text-white/80">{summaryTitle}</p>
         <div className="grid grid-cols-3 gap-2.5">
           {tiles.map((tile, i) => (
-            <div key={tile.label} className={`rounded-[1.1rem] p-3.5 ${i < 2 ? "bg-white text-ink" : "bg-white/20"}`}>
-              <p className="font-display text-[2.4rem] leading-none tracking-[-0.035em] tabular-nums">{tile.value}</p>
+            <div
+              key={tile.label}
+              className={`min-w-0 rounded-[1.1rem] p-3.5 max-[599px]:p-2.5 ${i < 2 ? "bg-white text-ink" : "bg-white/20"}`}
+            >
+              {/* smaller on a phone, so a three-digit figure still fits its tile */}
+              <p className="font-display text-[2.4rem] leading-none tracking-[-0.035em] tabular-nums max-[599px]:text-[1.5rem]">
+                {tile.value}
+              </p>
               <p className={`mt-1 text-[0.75rem] font-bold ${i < 2 ? "text-muted" : "text-white/85"}`}>{tile.label}</p>
             </div>
           ))}
@@ -59,10 +65,12 @@ export function HeroButton({
   children,
   filled = false,
   href,
+  onClick,
 }: {
   children: ReactNode;
   filled?: boolean;
   href?: string;
+  onClick?: () => void;
 }) {
   const className = `focus-ring inline-flex h-[2.6rem] cursor-pointer items-center gap-[0.45rem] whitespace-nowrap rounded-full border-[1.5px] px-5 text-[0.78rem] font-bold transition-colors ${
     filled
@@ -74,7 +82,7 @@ export function HeroButton({
       {children}
     </Link>
   ) : (
-    <button type="button" className={className}>
+    <button type="button" onClick={onClick} className={className}>
       {children}
     </button>
   );

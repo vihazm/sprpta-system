@@ -2,6 +2,7 @@
 
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 import type { NavItem } from "@/lib/roles";
 
 /** Sits inside a link and marks it while its page is loading, so the link can show it was pressed. */
@@ -10,9 +11,19 @@ function Pending() {
   return <span hidden data-pending={pending ? "" : undefined} />;
 }
 
+/**
+ * Sits inside a link and marks it when the page being shown is that item's page, or one under it (a case under
+ * Cases). The address is only known when the page is requested, so this waits in its own Suspense: the menu is on
+ * screen at once and the current item is marked a moment later.
+ */
+function Current({ href }: { href: string }) {
+  const pathname = usePathname();
+  const current = pathname === href || pathname.startsWith(`${href}/`);
+  return current ? <span data-current className="sr-only">(current page)</span> : null;
+}
+
 /** Side navigation: only the items of the signed-in role (UI Flow 1.3). */
 export function SideNav({ items }: { items: NavItem[] }) {
-  const pathname = usePathname();
   return (
     <nav
       aria-label="Main"
@@ -23,16 +34,14 @@ export function SideNav({ items }: { items: NavItem[] }) {
           <Link
             key={item.label}
             href={item.href}
-            aria-current={pathname === item.href ? "page" : undefined}
-            // Pressed: crimson at once while the mouse is down, and until the page has loaded.
-            className={`focus-ring rounded-[0.9rem] px-[0.95rem] py-[0.65rem] text-[0.92rem] font-bold transition-colors duration-100 active:bg-crimson active:text-white has-[[data-pending]]:bg-crimson has-[[data-pending]]:text-white ${
-              pathname === item.href
-                ? "bg-crimson text-white"
-                : "text-slate-ink hover:bg-field"
-            }`}
+            // Pressed or current: crimson. Pressed shows at once while the mouse is down and until the page has loaded.
+            className="focus-ring rounded-[0.9rem] px-[0.95rem] py-[0.65rem] text-[0.92rem] font-bold text-slate-ink transition-colors duration-100 hover:bg-field active:bg-crimson active:text-white has-[[data-current]]:bg-crimson has-[[data-current]]:text-white has-[[data-pending]]:bg-crimson has-[[data-pending]]:text-white"
           >
             {item.label}
             <Pending />
+            <Suspense fallback={null}>
+              <Current href={item.href} />
+            </Suspense>
           </Link>
         ) : (
           <span

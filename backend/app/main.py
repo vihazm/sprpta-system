@@ -15,6 +15,9 @@ from app.api.routes import (
     l1_daily_records,
     l1_dashboard,
     l1_recommendations,
+    l2_cases,
+    l2_dashboard,
+    l2_recommendations,
 )
 from app.core.config import settings
 from app.core.csrf import csrf_guard
@@ -51,6 +54,9 @@ app.include_router(l1_dashboard.router)
 app.include_router(l1_daily_records.router)
 app.include_router(l1_complaints.router)
 app.include_router(l1_recommendations.router)
+app.include_router(l2_dashboard.router)
+app.include_router(l2_cases.router)
+app.include_router(l2_recommendations.router)
 
 
 @app.get("/health")

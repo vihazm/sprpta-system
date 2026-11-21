@@ -70,7 +70,7 @@ def _matches_type(mime_type: str, content: bytes) -> bool:
     return b"\x00" not in content  # text and .eml are plain text: no NUL bytes
 
 
-def _storage_root() -> Path:
+def storage_root() -> Path:
     return BACKEND_DIR / settings.upload_dir  # an absolute upload_dir is used as it is
 
 
@@ -110,7 +110,7 @@ def add_attachment(
         raise ComplaintError(415, "file_type_mismatch", "That file's contents do not match its type.")
 
     stored = Path("complaints") / str(complaint.id) / f"{uuid4().hex}{extension}"
-    target = _storage_root() / stored
+    target = storage_root() / stored
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(content)
 

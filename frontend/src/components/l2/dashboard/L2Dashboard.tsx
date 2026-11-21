@@ -1,79 +1,38 @@
-import { ApprovalList } from "@/components/dashboard/ApprovalList";
 import { formatToday, greeting } from "@/components/dashboard/dates";
-import { DashboardHero, HeroButton, ReferenceSearch } from "@/components/dashboard/DashboardHero";
-import { muted } from "@/components/dashboard/ui";
+import { Note } from "@/components/dashboard/Note";
 import { getSession } from "@/lib/session";
-import { AreaWorkload } from "./AreaWorkload";
-import { CaseReview } from "./CaseReview";
-import { CasesByStage } from "./CasesByStage";
-import { EscalatedCases } from "./EscalatedCases";
-import { RecentlyClosed } from "./RecentlyClosed";
-import { RecommendationList } from "./RecommendationList";
-import { TimeTargets } from "./TimeTargets";
-import { UnclosedCases } from "./UnclosedCases";
-import { UrgentCases } from "./UrgentCases";
-import { l2DashboardSample } from "./sample-data";
+import { listCases, loadCase, loadDashboard } from "../api";
+import { L2Workspace } from "./L2Workspace";
 
-// The Level 2 area officer landing page (UC-L2-01): the officer's own area, the case being
-// reviewed with its decision form, and the work waiting. It shows sample data until the
-// complaints module exists.
+// The Level 2 area officer landing page (UC-L2-01): the officer's own area by status, the cases with the one
+// picked shown beside them, and what needs attention. Everything is read from the backend while the page is
+// built, so the cards arrive filled in.
 export async function L2Dashboard() {
-  const user = await getSession();
+  const [user, board, cases] = await Promise.all([
+    getSession(),
+    loadDashboard(),
+    listCases({ status: null, severity: null, search: "", sort: "urgent", page: 1 }),
+  ]);
   if (!user) return null; // the shell has already redirected unauthenticated visitors
+  if (!board.ok) return <Note tone="alert">{board.message}</Note>;
 
-  const data = l2DashboardSample;
+  const data = board.data;
+  const firstId = data.nextCaseId ?? (cases.ok ? cases.data.items[0]?.id : undefined);
+  const first = firstId ? await loadCase(firstId) : null;
   const now = new Date();
-  const area = user.areaName ?? "your";
-  const urgent = data.urgent.filter((c) => c.severity === "critical").length;
-  const overdue = data.urgent.filter((c) => c.overdue).length;
+  const urgent = data.urgent;
 
   return (
-    <div className="flex flex-col gap-4">
-      <DashboardHero
-        date={`${formatToday(now)} · ${area} area`}
-        title={`${greeting(user.name, now)} ${urgent} urgent ${urgent === 1 ? "case needs" : "cases need"} a decision.`}
-        intro={`${overdue} ${overdue === 1 ? "case is" : "cases are"} past its time target. ${data.approvals.length} completed jobs are waiting for your approval.`}
-        actions={
-          <>
-            <HeroButton filled>Open next urgent case</HeroButton>
-            <HeroButton>Approve completed cases</HeroButton>
-            <ReferenceSearch />
-          </>
-        }
-        summaryTitle="Your day so far"
-        tiles={[
-          { value: data.day.arrived, label: "Arrived today" },
-          { value: data.day.decided, label: "Decided" },
-          { value: data.approvals.length, label: "Awaiting approval" },
-        ]}
-        summaryNote={`${data.month.closed} closed this month · ${data.month.open} still open · ${data.month.overdue} overdue`}
-      />
-
-      <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">
-        <CaseReview review={data.caseToReview} className="min-[1200px]:col-span-8" />
-        <div className="flex min-w-0 flex-col gap-4 min-[1200px]:col-span-4">
-          <CasesByStage stages={data.stages} area={area} />
-          <UrgentCases cases={data.urgent} className="flex-1" />
-        </div>
-
-        <AreaWorkload data={data} area={area} className="min-[1200px]:col-span-4" />
-        <ApprovalList
-          title="Awaiting my approval"
-          subtitle={`${data.approvals.length} jobs marked done by implementing staff`}
-          approvals={data.approvals}
-          footnote={`${data.moreWithStaff} more decisions are still with implementing staff. Only Approve closes a case, and a closed case is never reopened.`}
-          className="min-[1200px]:col-span-4"
-        />
-        <UnclosedCases data={data} className="min-[1200px]:col-span-4" />
-
-        <RecommendationList items={data.recommendations} className="min-[1200px]:col-span-4" />
-        <EscalatedCases cases={data.escalated} className="min-[1200px]:col-span-4" />
-        <TimeTargets targets={data.targets} className="min-[1200px]:col-span-4" />
-
-        <RecentlyClosed cases={data.closed} className="min-[1200px]:col-span-12" />
-      </div>
-
-      <p className={`${muted} px-1.5`}>Sample data. Figures, names and records are placeholders.</p>
-    </div>
+    <L2Workspace
+      data={data}
+      initialCases={cases.ok ? cases.data : undefined}
+      initialCase={first?.ok ? first.data : null}
+      date={`${formatToday(now)} · ${user.areaName ?? "Your"} area`}
+      area={user.areaName ?? "your"}
+      title={`${greeting(user.name, now)} ${urgent === 0 ? "No urgent case is" : `${urgent} urgent ${urgent === 1 ? "case is" : "cases are"}`} waiting for a decision.`}
+      intro={`${data.counts.overdue} ${data.counts.overdue === 1 ? "case is" : "cases are"} past a time target. ${
+        data.counts.forwarded
+      } forwarded ${data.counts.forwarded === 1 ? "case has" : "cases have"} not been opened yet.`}
+    />
   );
 }
