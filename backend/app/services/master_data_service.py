@@ -65,7 +65,27 @@ def _must_exist(db: Session, model, row_id: int | None, what: str) -> None:
         raise MasterDataError(422, "not_found", f"Choose an active {what}.")
 
 
+def _same_name(db: Session, model, name: str, record, *where, unchanged: bool | None = None) -> None:
+    """Refuse a name that another record already has, whatever its letter case ("Galle" and "GALLE" are one name).
+
+    The database only refuses an exact copy. A record whose name is not being changed is left alone, so a look-alike
+    that already exists cannot block editing or deactivating it.
+    """
+    if unchanged is None:
+        unchanged = record is not None and record.name == name
+    if unchanged:
+        return
+    conditions = [func.lower(model.name) == name.lower(), *where]
+    if record is not None:
+        conditions.append(model.id != record.id)
+    other = db.scalar(select(model).where(*conditions))
+    if other is not None:
+        reuse = "" if other.is_active else " It is inactive: reactivate it instead."
+        raise MasterDataError(409, "already_exists", f'"{other.name}" already exists.{reuse}')
+
+
 def _check_area(db: Session, data: AreaFields, area: Area | None, active: bool) -> None:
+    _same_name(db, Area, data.name, area)
     if area and area.is_active and not active:
         # Complaints are forwarded by the vehicle's area, so an area still in use must stay on.
         in_use = db.scalar(select(func.count()).select_from(Vehicle).where(Vehicle.registered_area_id == area.id, Vehicle.is_active))
@@ -78,6 +98,18 @@ def _check_area(db: Session, data: AreaFields, area: Area | None, active: bool) 
 
 def _check_route(db: Session, data: RouteStandFields, route: RouteStand | None, active: bool) -> None:
     _must_exist(db, Area, data.area_id, "area")
+    # A route or stand is unique by its kind, name and area, so the same name may exist in another area.
+    unchanged = (
+        route is not None and (route.name, route.kind, route.area_id) == (data.name, data.kind, data.area_id)
+    )
+    _same_name(
+        db, RouteStand, data.name, route,
+        RouteStand.kind == data.kind, RouteStand.area_id.is_not_distinct_from(data.area_id), unchanged=unchanged,
+    )
+
+
+def _check_category(db: Session, data: CategoryFields, category: ComplaintCategory | None, active: bool) -> None:
+    _same_name(db, ComplaintCategory, data.name, category)
 
 
 def _check_vehicle(db: Session, data: VehicleFields, vehicle: Vehicle | None, active: bool) -> None:
@@ -101,11 +133,13 @@ def _check_severity(db: Session, data: NameOnly, severity: Severity | None, acti
         raise MasterDataError(409, "fixed_list", "The four severities are fixed. You can rename them.")
     if not active:
         raise MasterDataError(409, "fixed_list", "Severities cannot be deactivated.")
+    _same_name(db, Severity, data.name, severity)
 
 
 def _check_medium(db: Session, data: NameOnly, medium: ComplaintMedium | None, active: bool) -> None:
     if medium and medium.is_system and (not active or data.name != medium.name):
         raise MasterDataError(409, "system_medium", f"{medium.name} is used by the complainant portal and cannot be changed.")
+    _same_name(db, ComplaintMedium, data.name, medium)
 
 
 # ---------------------------------------------------------------- the kinds
@@ -171,7 +205,9 @@ ENTITIES: dict[str, Entity] = {
         (Person.full_name, Person.staff_number, Person.phone),
         (Person.full_name, Person.id),
     ),
-    "categories": Entity(ComplaintCategory, CategoryFields, "category", (ComplaintCategory.name,), (ComplaintCategory.name,)),
+    "categories": Entity(
+        ComplaintCategory, CategoryFields, "category", (ComplaintCategory.name,), (ComplaintCategory.name,), _check_category
+    ),
     "severities": Entity(
         Severity, NameOnly, "severity", (Severity.name,), (Severity.rank,), _check_severity, read_only=("rank",)
     ),
