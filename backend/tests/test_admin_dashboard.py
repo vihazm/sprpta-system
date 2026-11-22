@@ -2,6 +2,7 @@ from collections import namedtuple
 from datetime import UTC, datetime, timedelta
 from itertools import count
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.core.enums import ComplaintStatus, VehicleType
@@ -27,6 +28,13 @@ from tests.conftest import make_complainant, make_user, sign_in
 URL = "/api/admin/dashboard"
 NUMBERS = count(1)
 DiskUsage = namedtuple("DiskUsage", "total used free")
+
+
+@pytest.fixture(autouse=True)
+def roomy_disk(monkeypatch):
+    """The dashboard reads the real disk. Pin it to a roomy one, so that a nearly full disk on the machine running
+    the tests does not add a "File storage is almost full" item. The low-space test sets its own."""
+    monkeypatch.setattr(system_health_service.shutil, "disk_usage", lambda _: DiskUsage(total=1000, used=100, free=900))
 
 
 def signed_in_admin(db, client) -> None:
