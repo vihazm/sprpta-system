@@ -1,13 +1,11 @@
 import type { AdminDashboardData } from "./types";
-import { PillButton, eyebrow } from "@/components/dashboard/ui";
+import { PillButton, PillLink, eyebrow } from "@/components/dashboard/ui";
 
 export function Shortcuts({
   timeTargets,
-  settings,
   className = "",
 }: {
   timeTargets: AdminDashboardData["timeTargets"];
-  settings: AdminDashboardData["settings"];
   className?: string;
 }) {
   return (
@@ -15,8 +13,12 @@ export function Shortcuts({
       <h3 className="text-[1.06rem] font-extrabold tracking-[-0.015em] text-crimson-deep">Shortcuts</h3>
 
       <div className="grid grid-cols-2 gap-2">
-        <PillButton primary className="h-10">Create user</PillButton>
-        <PillButton className="h-10">Add vehicle</PillButton>
+        <PillLink href="/admin/users" primary className="h-10">
+          Create user
+        </PillLink>
+        <PillLink href="/admin/master-data/vehicles" className="h-10">
+          Add vehicle
+        </PillLink>
         <PillButton className="h-10">Upload policy</PillButton>
         <PillButton className="h-10">Edit template</PillButton>
       </div>
@@ -32,14 +34,6 @@ export function Shortcuts({
             </span>
           </div>
         ))}
-        <div className="mt-0.5 flex flex-wrap gap-[0.4rem] text-[0.72rem] font-bold text-crimson-deep">
-          <span className="rounded-full bg-white px-[0.7rem] py-1">
-            Rating formula v{settings.ratingFormulaVersion}
-          </span>
-          <span className="rounded-full bg-white px-[0.7rem] py-1">
-            AI timeout {settings.aiTimeoutSeconds} s
-          </span>
-        </div>
       </div>
     </section>
   );

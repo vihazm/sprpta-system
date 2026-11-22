@@ -57,6 +57,29 @@ npm run dev
 
 Open http://localhost:3000 and sign in.
 
+## Backups
+
+`python -m app.scripts.backup` dumps the database and zips the evidence folder into `backend/backups/`, keeps the newest 14 runs and records the result, which System health and the admin dashboard show. There is no background worker, so schedule it once a day with the operating system. If `pg_dump` is not on `PATH`, set `PG_DUMP_PATH` in `backend/.env`.
+
+Windows (Task Scheduler, every day at 02:00):
+
+```bash
+schtasks /Create /TN "SPRPTA backup" /SC DAILY /ST 02:00 /TR "cmd /c cd /d C:\path\to\backend && .venv\Scripts\python.exe -m app.scripts.backup"
+```
+
+Linux (cron, `crontab -e`):
+
+```bash
+0 2 * * * cd /path/to/backend && .venv/bin/python -m app.scripts.backup
+```
+
+To restore, create an empty database and load a dump into it, then unzip the matching `-files.zip` into the upload folder:
+
+```bash
+createdb sprpta_db
+pg_restore --no-owner -d sprpta_db backups/sprpta-20261122-020000.dump
+```
+
 ## Development accounts
 
 `python -m app.scripts.seed` creates these only while `APP_ENV=development`. They exist so every role's landing page can be tried; they are never created in production.

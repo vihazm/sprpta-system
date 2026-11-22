@@ -2,6 +2,7 @@
 // They follow the System Flow, UI Flow and Database Structure documents.
 
 import type { Tone } from "@/components/dashboard/ui";
+import type { Backup, FileStorage } from "../system-health/types";
 
 export type { Tone };
 
@@ -11,7 +12,8 @@ export type AttentionItem = {
   title: string;
   detail: string;
   tone: Tone;
-  action?: string;
+  href: string; // the page where it is dealt with
+  action: string; // the label of the button that opens it
 };
 
 export type Count = { label: string; count: number };
@@ -32,24 +34,17 @@ export type TimeTarget = {
   closeDays: number;
 };
 
-// The part of the dashboard the backend already provides. The rest is sample data for now.
-export type LiveDashboardData = Pick<
-  AdminDashboardData,
-  | "sessions"
-  | "staffByRole"
-  | "portalUsers"
-  | "deactivatedUsers"
-  | "signInsPerHour"
-  | "currentHour"
-  | "recentUsage"
-  | "services"
-  | "apiResponseMs"
->;
+// The two tiles still on sample data, until the policy library and messaging exist.
+export type SampleDashboardData = Pick<AdminDashboardData, "policy" | "messages">;
+
+// Everything else comes from the backend.
+export type LiveDashboardData = Omit<AdminDashboardData, keyof SampleDashboardData>;
 
 export type AdminDashboardData = {
   services: Service[];
   apiResponseMs: number[]; // last 24 hours, oldest first
-  lastBackup?: { when: string; succeeded: boolean }; // none until backups are recorded
+  fileStorage: FileStorage;
+  lastBackup: Backup | null; // null until the backup script has run once
   attention: AttentionItem[]; // most urgent first
   sessions: {
     signedInNow: number;
@@ -84,9 +79,8 @@ export type AdminDashboardData = {
   complaints: {
     perDay: number[]; // last 30 days, oldest first
     byArea: Count[];
-    byStatus: Count[];
-    overdue: number;
+    byStatus: Count[]; // labelled with the status's name, for example "Under review"
+    overdue: number; // open cases past a time target now
   };
   timeTargets: TimeTarget[];
-  settings: { ratingFormulaVersion: number; aiTimeoutSeconds: number };
 };

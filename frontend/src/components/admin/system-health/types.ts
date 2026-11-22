@@ -1,7 +1,7 @@
 import type { Tone } from "../dashboard/types";
 
 // Shapes used by the administrator's System health page (UI-AD-07).
-// Only the web app, the API and the database can be checked so far.
+// The web app, the API and the database are timed; file storage and backups are read as they are.
 
 export type ServiceKey = "web" | "api" | "database";
 
@@ -36,6 +36,23 @@ export type HealthEvent = {
   tone: Tone;
 };
 
+export type FileStorage = {
+  totalBytes: number; // the disk the evidence folder is on
+  freeBytes: number;
+  low: boolean; // less than a tenth of the disk is free
+  evidenceFiles: number;
+  evidenceBytes: number;
+};
+
+/** The last run of the backup script. */
+export type Backup = {
+  finishedAt: string;
+  succeeded: boolean;
+  sizeBytes: number | null;
+  error: string | null;
+  stale: boolean; // more than a day old, so the daily run was missed
+};
+
 export type SystemHealthData = {
   checkedAt: string | null; // when the newest reading was taken
   services: HealthService[];
@@ -44,6 +61,8 @@ export type SystemHealthData = {
   database: { connections: number; maxConnections: number; sizeBytes: number; startedAt: string };
   apiStartedAt: string;
   events: HealthEvent[];
+  fileStorage: FileStorage;
+  lastBackup: Backup | null; // null until the backup script has run once
 };
 
 // What one service tile shows.

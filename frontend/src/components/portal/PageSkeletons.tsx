@@ -82,7 +82,7 @@ export function AdminDashboardSkeleton() {
 const systemHealth: Cell[] = [
   [8, "min-h-[17rem]"], [4, "min-h-[17rem]"],
   [4, "min-h-[11rem]"], [4, "min-h-[11rem]"], [4, "min-h-[11rem]"],
-  [4, "min-h-[11rem]"], [4, "min-h-[11rem]"], [4, "min-h-[11rem]"],
+  [3, "min-h-[11rem]"], [3, "min-h-[11rem]"], [3, "min-h-[11rem]"], [3, "min-h-[11rem]"],
   [7, "min-h-[14rem]"], [5, "min-h-[14rem]"],
 ];
 

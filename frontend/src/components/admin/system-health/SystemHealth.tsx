@@ -1,6 +1,8 @@
 import { PulseHero } from "../dashboard/PulseHero";
 import { Card, muted } from "@/components/dashboard/ui";
+import { BackupTile } from "./BackupTile";
 import { ChecksTile } from "./ChecksTile";
+import { FileStorageTile } from "./FileStorageTile";
 import { PendingTile } from "./PendingTile";
 import { RecentEvents } from "./RecentEvents";
 import { ServiceTile } from "./ServiceTile";
@@ -10,8 +12,9 @@ import { PENDING_SERVICES, buildMetrics } from "./metrics";
 import { heroServices } from "./status";
 
 // The content of the administrator's System health page (UI-AD-07). One column on
-// narrow screens, a 12-column bento grid from 1200px up. The web app, the API and the
-// database are checked for real; the other services show as "not set up" until they exist.
+// narrow screens, a 12-column bento grid from 1200px up. The web app, the API, the
+// database, file storage and backups are real; the AI service and messaging show as
+// "not set up" until they exist.
 export async function SystemHealth() {
   const data = await getSystemHealth();
 
@@ -30,8 +33,9 @@ export async function SystemHealth() {
 
       <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">
         <PulseHero
-          services={heroServices(data.services)}
+          services={heroServices(data.services, data.fileStorage)}
           apiResponseMs={data.series.api}
+          lastBackup={data.lastBackup}
           className="min-[1200px]:col-span-8"
         />
         <UptimeTile uptime={data.uptime} className="min-[1200px]:col-span-4" />
@@ -39,8 +43,10 @@ export async function SystemHealth() {
         {buildMetrics(data).map((metric) => (
           <ServiceTile key={metric.name} metric={metric} className="min-[1200px]:col-span-4" />
         ))}
+        <FileStorageTile storage={data.fileStorage} className="min-[1200px]:col-span-3" />
+        <BackupTile backup={data.lastBackup} className="min-[1200px]:col-span-3" />
         {PENDING_SERVICES.map((service) => (
-          <PendingTile key={service.name} {...service} className="min-[1200px]:col-span-4" />
+          <PendingTile key={service.name} {...service} className="min-[1200px]:col-span-3" />
         ))}
 
         <RecentEvents events={data.events} className="min-[1200px]:col-span-7" />
