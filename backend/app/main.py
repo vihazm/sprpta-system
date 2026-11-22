@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import (
     admin_dashboard,
     admin_duty_records,
+    admin_master_data,
+    admin_statistics,
     admin_system_health,
     admin_users,
     auth,
@@ -49,6 +51,8 @@ app.include_router(admin_dashboard.router)
 app.include_router(admin_system_health.router)
 app.include_router(admin_users.router)
 app.include_router(admin_duty_records.router)
+app.include_router(admin_master_data.router)
+app.include_router(admin_statistics.router)
 app.include_router(l1_bus_lookup.router)
 app.include_router(l1_dashboard.router)
 app.include_router(l1_daily_records.router)
