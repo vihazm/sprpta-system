@@ -172,3 +172,84 @@ def test_the_portal_medium_cannot_be_changed(client, db, admin):
     assert error_code(edit(client, "mediums", portal.id, active=False, name="Portal")) == "system_medium"
     assert error_code(edit(client, "mediums", portal.id, name="Website")) == "system_medium"
     assert add(client, "mediums", name="Fax").status_code == 201
+
+
+# ---------------------------------------------------------------- names are unique whatever their letter case
+
+
+def test_names_that_differ_only_by_letter_case_or_spacing_are_the_same_name(client, db, admin):
+    for entity, field in (("areas", "name"), ("categories", "name"), ("mediums", "name")):
+        assert add(client, entity, **{field: "Weekend Service"}).status_code == 201
+        for copy in ("WEEKEND SERVICE", "weekend service", "Weekend  SERVICE", "  weekend service  "):
+            refused = add(client, entity, **{field: copy})
+            assert refused.status_code == 409 and error_code(refused) == "already_exists", (entity, copy)
+        message = add(client, entity, **{field: "WEEKEND SERVICE"}).json()["detail"]["message"]
+        assert '"Weekend Service"' in message  # it names the record that is already there
+        assert add(client, entity, **{field: "Weekend Service Plus"}).status_code == 201  # only a whole name clashes
+    assert db.query(ComplaintCategory).filter(ComplaintCategory.name.ilike("weekend service")).count() == 1
+
+
+def test_renaming_to_another_records_name_in_another_case_is_refused(client, db, admin):
+    first = add(client, "categories", name="Overcharging").json()
+    second = add(client, "categories", name="Rude staff").json()
+    refused = edit(client, "categories", second["id"], name="OVERCHARGING")
+    assert refused.status_code == 409 and error_code(refused) == "already_exists"
+    assert edit(client, "categories", first["id"], name="OVERCHARGING").json()["name"] == "OVERCHARGING"  # its own name
+
+
+def test_the_message_says_when_the_existing_record_is_inactive(client, db, admin):
+    old = add(client, "areas", name="Old District").json()
+    assert edit(client, "areas", old["id"], active=False, name="Old District").status_code == 200
+    refused = add(client, "areas", name="old district")
+    assert refused.status_code == 409 and "inactive" in refused.json()["detail"]["message"]
+
+
+def test_a_look_alike_that_already_exists_does_not_block_editing_or_deactivating_it(client, db, admin):
+    first = ComplaintCategory(name="Fares")
+    twin = ComplaintCategory(name="FARES")  # saved before the check existed
+    db.add_all([first, twin])
+    db.commit()
+    assert edit(client, "categories", twin.id, active=False, name="FARES").status_code == 200  # name unchanged
+    assert edit(client, "categories", first.id, description="About fares", name="Fares").status_code == 200
+    assert error_code(add(client, "categories", name="fares")) == "already_exists"  # but no new copy
+
+
+def test_severities_and_mediums_cannot_be_renamed_to_a_look_alike(client, db, admin):
+    critical = Severity(name="Critical", rank=1, forward_days=0, decide_days=1, close_days=3, rating_weight=Decimal(8))
+    high = Severity(name="High", rank=2, forward_days=1, decide_days=3, close_days=7, rating_weight=Decimal(4))
+    db.add_all([critical, high])
+    db.commit()
+    refused = edit(client, "severities", high.id, name="CRITICAL")
+    assert refused.status_code == 409 and error_code(refused) == "already_exists"
+    assert edit(client, "severities", high.id, name="High priority").status_code == 200
+    portal = ComplaintMedium(name="Portal", is_system=True)
+    db.add(portal)
+    db.commit()
+    fax = add(client, "mediums", name="Fax").json()
+    assert error_code(edit(client, "mediums", fax["id"], name="PORTAL")) == "already_exists"
+    assert error_code(add(client, "mediums", name="portal")) == "already_exists"
+
+
+def test_routes_are_unique_by_kind_and_area_without_regard_to_case(client, db, admin, galle):
+    matara = add(client, "areas", name="Matara").json()
+    route = add(client, "routes", kind="route", name="Galle - Matara", area_id=galle.id)
+    assert route.status_code == 201
+    same = add(client, "routes", kind="route", name="GALLE - MATARA", area_id=galle.id)
+    assert same.status_code == 409 and error_code(same) == "already_exists"
+    assert add(client, "routes", kind="route", name="GALLE - MATARA", area_id=matara["id"]).status_code == 201  # another area
+    assert add(client, "routes", kind="stand", name="GALLE - MATARA", area_id=galle.id).status_code == 201  # another kind
+    # With no area at all, the database lets any copy through, so the check does the work.
+    assert add(client, "routes", kind="route", name="Express").status_code == 201
+    assert error_code(add(client, "routes", kind="route", name="EXPRESS")) == "already_exists"
+    # Moving a route into an area that has a look-alike is refused too.
+    coastal = add(client, "routes", kind="route", name="Coastal", area_id=matara["id"]).json()
+    assert add(client, "routes", kind="route", name="COASTAL", area_id=galle.id).status_code == 201  # another area
+    moved = edit(client, "routes", coastal["id"], kind="route", name="Coastal", area_id=galle.id)
+    assert moved.status_code == 409 and error_code(moved) == "already_exists"
+
+
+def test_people_may_share_a_name_and_vehicles_keep_their_own_rule(client, db, admin, galle):
+    assert add(client, "people", full_name="Saman Perera", person_type="driver").status_code == 201
+    assert add(client, "people", full_name="SAMAN PERERA", person_type="conductor").status_code == 201  # two real people
+    assert add(client, "vehicles", vehicle_number="ND 5555", vehicle_type="bus", registered_area_id=galle.id).status_code == 201
+    assert error_code(add(client, "vehicles", vehicle_number="nd-5555", vehicle_type="bus", registered_area_id=galle.id)) == "already_exists"
