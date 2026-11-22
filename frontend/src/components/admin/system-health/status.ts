@@ -1,5 +1,5 @@
 import type { Service, Tone } from "../dashboard/types";
-import type { HealthService, ServiceState } from "./types";
+import type { FileStorage, HealthService, ServiceState } from "./types";
 
 export const STATE_TONE: Record<ServiceState, Tone> = {
   ok: "ok",
@@ -22,11 +22,17 @@ const PROBLEM_PHRASE: Record<Exclude<ServiceState, "ok">, string> = {
   unknown: "still starting up",
 };
 
-/** What the hero's ring and pills show for each service. */
-export function heroServices(services: HealthService[]): Service[] {
-  return services.map((service) => ({
-    name: service.name,
-    tone: STATE_TONE[service.state],
-    detail: service.state === "ok" ? `${service.latencyMs} ms` : PROBLEM_PHRASE[service.state],
-  }));
+/** How much of the disk with the evidence files is free, as a whole percent. */
+export const percentFree = (storage: FileStorage) => Math.round((100 * storage.freeBytes) / storage.totalBytes);
+
+/** What the hero's ring and pills show: each checked service, then file storage. */
+export function heroServices(services: HealthService[], storage: FileStorage): Service[] {
+  return [
+    ...services.map((service) => ({
+      name: service.name,
+      tone: STATE_TONE[service.state],
+      detail: service.state === "ok" ? `${service.latencyMs} ms` : PROBLEM_PHRASE[service.state],
+    })),
+    { name: "File storage", tone: storage.low ? "warn" : "ok", detail: `${percentFree(storage)}% free` },
+  ];
 }

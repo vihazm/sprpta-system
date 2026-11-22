@@ -1,7 +1,7 @@
 """Response shapes of the administrator's System health page (UI-AD-07).
 
-Only the services the backend can check itself are here: the web app, the API and the
-database. The rest (files, AI, messages, backups) have no source yet.
+The web app, the API and the database are timed by the health checks. File storage and the
+last backup are read when the page is asked for. The AI service and messaging have no source yet.
 """
 
 from datetime import datetime
@@ -48,6 +48,24 @@ class HealthEventOut(BaseModel):
     tone: Literal["ok", "warn", "crit", "info"]
 
 
+class FileStorage(BaseModel):
+    total_bytes: int  # the disk the evidence folder is on
+    free_bytes: int
+    low: bool  # less than a tenth of the disk is free
+    evidence_files: int
+    evidence_bytes: int
+
+
+class Backup(BaseModel):
+    """The last run of the backup script (F-66)."""
+
+    finished_at: datetime
+    succeeded: bool
+    size_bytes: int | None  # the database dump and the evidence files together
+    error: str | None
+    stale: bool  # more than a day old, so the daily run has been missed
+
+
 class SystemHealth(BaseModel):
     checked_at: datetime | None  # when the newest reading was taken
     services: list[ServiceStatus]
@@ -56,3 +74,5 @@ class SystemHealth(BaseModel):
     database: DatabaseStats
     api_started_at: datetime
     events: list[HealthEventOut]
+    file_storage: FileStorage
+    last_backup: Backup | None  # None until the backup script has run once

@@ -9,14 +9,12 @@ import { SEVERITY_COLOR } from "@/components/dashboard/severity";
 import { StatBox } from "@/components/dashboard/StatBox";
 import { Card, CardHeading, PillButton, muted } from "@/components/dashboard/ui";
 import { Icon } from "@/components/dashboard/icons";
-import { STATUS_LABEL } from "@/components/l2/status";
+import { statusName } from "../complaint-status";
 import { loadStatistics, type CountRow, type Filters, type Option, type Statistics } from "./api";
 import { download, statisticsCsv } from "./csv";
 import { PERIODS, periodDates, type Period } from "./period";
 import { TimeTargets } from "./TimeTargets";
 
-const STATUS_NAMES: Record<string, string> = { ...STATUS_LABEL, incomplete: "Incomplete", rejected: "Rejected" };
-const statusName = (key: string) => STATUS_NAMES[key] ?? key;
 const SEVERITY_COLORS = Object.values(SEVERITY_COLOR); // Critical to Low
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

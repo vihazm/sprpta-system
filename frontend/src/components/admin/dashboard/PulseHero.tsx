@@ -1,3 +1,6 @@
+import { Icon } from "@/components/dashboard/icons";
+import { formatSince } from "../system-health/format";
+import type { Backup } from "../system-health/types";
 import { AreaChart } from "./AreaChart";
 import type { Service, Tone } from "./types";
 
@@ -38,9 +41,10 @@ export function PulseHero({
 }: {
   services: Service[];
   apiResponseMs: number[];
-  lastBackup?: { when: string; succeeded: boolean }; // left out until backups are recorded
+  lastBackup: Backup | null; // null until the backup script has run once
   className?: string;
 }) {
+  const backupFine = lastBackup?.succeeded && !lastBackup.stale;
   const healthy = services.filter((s) => s.tone === "ok").length;
   const problem = services.find((s) => s.tone !== "ok");
   const headline = services.some((s) => s.tone === "crit")
@@ -108,25 +112,14 @@ export function PulseHero({
           <span className="rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
             API response time, 24 hours
           </span>
-          {lastBackup && (
-            <span className="inline-flex items-center gap-[0.4rem] rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
-              <svg
-                width="13"
-                height="13"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className="text-emerald-300"
-              >
-                <path d="M5 12.5l4.5 4.5L19 7.5" />
-              </svg>
-              Last backup {lastBackup.when}, {lastBackup.succeeded ? "successful" : "failed"}
+          <span className="inline-flex items-center gap-[0.4rem] rounded-full border border-white/25 bg-white/15 px-[0.7rem] py-[0.3rem] backdrop-blur-sm">
+            <span className={backupFine ? "text-emerald-300" : "text-amber-300"}>
+              <Icon name={backupFine ? "check" : "warning"} size={13} />
             </span>
-          )}
+            {lastBackup
+              ? `Last backup ${formatSince(lastBackup.finishedAt)}, ${lastBackup.succeeded ? "successful" : "failed"}`
+              : "No backup yet"}
+          </span>
         </div>
         {apiResponseMs.length > 1 ? (
           <AreaChart
