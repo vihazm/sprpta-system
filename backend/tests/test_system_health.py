@@ -130,9 +130,11 @@ def test_a_change_of_state_is_noted_once_and_the_last_outage_is_timed(client, db
     save_readings([reading("database", "ok", 6, minutes_ago=6)])
 
     body = client.get(URL).json()
-    titles = [e["title"] for e in body["events"]]
+    # The server's real start time is also listed. It can fall anywhere in this made-up timeline, so leave it out.
+    events = [e for e in body["events"] if e["title"] != "Database started"]
+    titles = [e["title"] for e in events]
     assert titles[:2] == ["Database is back to normal", "Database stopped responding"]
-    assert body["events"][1]["tone"] == "crit" and body["events"][1]["detail"] == "Could not connect"
+    assert events[1]["tone"] == "crit" and events[1]["detail"] == "Could not connect"
     outage = body["uptime"]["last_outage"]
     assert (outage["service_name"], outage["minutes"], outage["reason"]) == ("Database", 14, "Could not connect")
 
