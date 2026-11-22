@@ -38,6 +38,8 @@ def render(
     reference: str,
     area: str,
     vehicle: str,
+    route: str,
+    against: str,
     officer: str,
     generated_at: datetime,
     summary: str,
@@ -65,8 +67,10 @@ def render(
 
     facts = [
         ("Case reference", reference),
-        ("Area", area),
+        ("Against", against),  # whom the implementing staff act on
         ("Vehicle", vehicle),
+        ("Route or stand", route),
+        ("Area", area),
         ("Decided by", officer),
         ("Date", generated_at.strftime("%d %B %Y, %H:%M")),
     ]
@@ -76,7 +80,7 @@ def render(
         pdf.cell(38, 6.5, label)
         pdf.set_font("Noto", "B", 10.5)
         pdf.set_text_color(*INK)
-        pdf.cell(0, 6.5, value, new_x="LMARGIN", new_y="NEXT")
+        pdf.multi_cell(0, 6.5, value or "–", align="L", new_x="LMARGIN", new_y="NEXT")  # a long name wraps
 
     _section(pdf, "Complaint summary", summary)
     _section(pdf, "Verdict", verdict)

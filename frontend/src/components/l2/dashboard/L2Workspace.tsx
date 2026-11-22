@@ -5,6 +5,7 @@ import { DashboardHero, HeroButton } from "@/components/dashboard/DashboardHero"
 import { CaseList } from "../CaseList";
 import { STATUS_LABEL } from "../status";
 import type { CaseDetail, CaseFilter, CasePage, DashboardData } from "../types";
+import { AreaStatistics } from "./AreaStatistics";
 import { CaseGlance } from "./CaseGlance";
 import { OverdueAlerts } from "./OverdueAlerts";
 import { RecommendationList } from "./RecommendationList";
@@ -93,6 +94,8 @@ export function L2Workspace({
 
         <RecommendationList items={data.recommendations} className="min-[1200px]:col-span-7" />
         <TimeTargets targets={data.targets} averageDays={data.averageDecideDays} className="min-[1200px]:col-span-5" />
+
+        <AreaStatistics stats={data.statistics} area={area} className="min-[1200px]:col-span-12" />
       </div>
     </div>
   );

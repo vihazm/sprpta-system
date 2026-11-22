@@ -29,10 +29,10 @@ export const SEVERITY_CHOICES: Choice[] = (Object.keys(SEVERITY_LABEL) as Severi
   dot: SEVERITY_COLOR[s],
 }));
 
-export function SeverityChip({ severity }: { severity: Severity }) {
+export function SeverityChip({ severity, large = false }: { severity: Severity; large?: boolean }) {
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-[0.6rem] py-[0.15rem] text-[0.69rem] font-bold ${CHIP_STYLE[severity]}`}
+      className={`inline-flex whitespace-nowrap rounded-full px-[0.6rem] py-[0.15rem] font-bold ${large ? "text-[0.78rem]" : "text-[0.69rem]"} ${CHIP_STYLE[severity]}`}
     >
       {SEVERITY_LABEL[severity]}
     </span>
