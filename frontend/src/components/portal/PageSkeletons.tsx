@@ -104,6 +104,38 @@ export function UsersSkeleton() {
   );
 }
 
+export function MasterDataSkeleton() {
+  return (
+    <div className={stack}>
+      <HeadingBar />
+      <SkeletonGrid cells={Array.from({ length: 8 }, (): Cell => [3, "min-h-[10.5rem]"])} />
+    </div>
+  );
+}
+
+export function RecordsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">
+      <div className="min-[1200px]:col-span-8">
+        <TableCard rows={6} />
+      </div>
+      <SkeletonCard height="min-h-[12rem]" className="self-start min-[1200px]:col-span-4" />
+    </div>
+  );
+}
+
+const statistics: Cell[] = [
+  [12, "min-h-[9rem]"],
+  [12, "min-h-[7rem]"],
+  [6, "min-h-[16rem]"], [6, "min-h-[16rem]"],
+  [4, "min-h-[14rem]"], [4, "min-h-[14rem]"], [4, "min-h-[14rem]"],
+  [4, "min-h-[16rem]"], [8, "min-h-[16rem]"],
+];
+
+export function StatisticsSkeleton() {
+  return <SkeletonGrid cells={statistics} />;
+}
+
 const l1Dashboard: Cell[] = [
   [8, "min-h-[32rem]"], [4, "min-h-[32rem]"],
   [12, "min-h-[8rem]"],
