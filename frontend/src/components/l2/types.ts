@@ -92,6 +92,14 @@ export type DashboardData = {
   averageDecideDays: number | null;
   targets: TimeTarget[];
   recommendations: RecommendationRow[];
+  statistics: AreaStatistics;
+};
+
+/** The officer's area over the last 12 months. */
+export type AreaStatistics = {
+  cases: number;
+  categories: { name: string; count: number }[]; // the five most common
+  outcomes: Partial<Record<DecisionOutcome, number>>; // decided cases only
 };
 
 export type DecisionAction = "warning" | "fine" | "suspension" | "legal_action" | "no_action";
@@ -137,6 +145,8 @@ export type CaseDetail = CaseRow & {
     subject: string | null;
     status: string;
     registeredAt: string | null;
+    area: string | null;
+    ownArea: boolean; // a case of another area is a summary only and cannot be opened
     action: DecisionAction | null;
     outcome: DecisionOutcome | null;
   }[];

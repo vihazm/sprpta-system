@@ -5,12 +5,12 @@ Under review. The officer then records a decision and creates the solution docum
 Awaiting implementation, or escalates it to Level 3 with a reason. Every move is written to the audit trail.
 
 Overdue is a flag, never a status: a case is overdue when the time target of its stage has passed, counted in
-calendar days from registration without the time it spent Incomplete. Decide-by applies until the officer records
-a decision, and close-by after that. The AI suggestion and Approve (which needs the implementing staff portal) are
+calendar days from registration without the time it spent Incomplete. Decide-by applies until the solution document
+is created (the decision alone can still change), and close-by after that. The AI suggestion and Approve (which needs the implementing staff portal) are
 not built yet, and neither is the messaging module, so the decision message (MSG-2) is not sent here.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -40,12 +40,14 @@ from app.models import (
     Vehicle,
 )
 from app.schemas.l2_cases import (
+    AreaStatistics,
     AttachmentInfo,
     CaseDetail,
     CaseFilter,
     CasePage,
     CaseRow,
     CaseSort,
+    CategoryCount,
     DashboardOut,
     DecisionBody,
     DecisionOut,
@@ -75,6 +77,7 @@ ROUTED = (
 )
 DECIDING = (ComplaintStatus.FORWARDED, ComplaintStatus.UNDER_REVIEW)
 IMPLEMENTING = (ComplaintStatus.AWAITING_IMPLEMENTATION, ComplaintStatus.DONE_AWAITING_APPROVAL)
+FILE_VIEWS = ("attachment.view", "solution_document.view")  # kept in the audit trail, left out of the case History
 
 # The four severities by rank. The names can be edited by the administrator, the ranks cannot.
 SEVERITY_KEYS = {1: "critical", 2: "high", 3: "medium", 4: "low"}
@@ -102,15 +105,18 @@ OUTCOME_LABEL = {
 
 
 def _awaiting_decision():
-    """True for a case the officer has not decided yet."""
-    return and_(Complaint.status.in_(DECIDING), Complaint.decided_at.is_(None))
+    """True for a case the officer has not decided yet, that is, with no solution document."""
+    return Complaint.status.in_(DECIDING)
 
 
 def _due_at():
-    """When the time target of the case's current stage passes; empty once Level 2 has no target left."""
+    """When the time target of the case's current stage passes; empty once Level 2 has no target left.
+
+    An escalated case is Level 3's from then on, including after Level 3 decides it, so it carries no target here.
+    """
     days = case(
         (_awaiting_decision(), Severity.decide_days),
-        (Complaint.status.in_((*DECIDING, *IMPLEMENTING)), Severity.close_days),
+        (and_(Complaint.status.in_(IMPLEMENTING), Complaint.escalated_at.is_(None)), Severity.close_days),
     )
     due = Complaint.registered_at + Complaint.paused_total + func.make_interval(0, 0, 0, days)
     return type_coerce(due, DateTime(timezone=True))
@@ -122,8 +128,8 @@ def _overdue():
 
 def _due_kind(c: Complaint) -> str | None:
     if c.status in DECIDING:
-        return "close" if c.decided_at else "decide"
-    return "close" if c.status in IMPLEMENTING else None
+        return "decide"
+    return "close" if c.status in IMPLEMENTING and c.escalated_at is None else None
 
 
 # ---------------------------------------------------------------- the officer's area
@@ -245,19 +251,20 @@ def dashboard(db: Session, officer: Principal) -> DashboardOut:
     waiting = [*area, _awaiting_decision()]
 
     next_case = _rows(db, waiting, sort="urgent", limit=1)
+    # Counted like the time targets: from registration to the solution document, without the time spent Incomplete.
     average = db.scalar(
-        select(func.avg(func.extract("epoch", Complaint.decided_at - Complaint.registered_at))).where(
-            Complaint.area_id == _area_id(officer), Complaint.decided_at >= month
-        )
+        select(
+            func.avg(func.extract("epoch", Complaint.decided_at - Complaint.registered_at - Complaint.paused_total))
+        ).where(Complaint.area_id == _area_id(officer), Complaint.decided_at >= month)
     )
     targets = db.scalars(select(Severity).where(Severity.is_active).order_by(Severity.rank))
     return DashboardOut(
         counts=_counts(db, area),
         arrived_today=_count(db, *area, Complaint.forwarded_at >= today),
-        decided_today=db.scalar(
+        decided_today=db.scalar(  # a case counts as decided once its solution document exists
             select(func.count())
-            .select_from(CaseDecision)
-            .where(CaseDecision.decided_by_user_id == officer.id, CaseDecision.decided_at >= today)
+            .select_from(SolutionDocument)
+            .where(SolutionDocument.generated_by_user_id == officer.id, SolutionDocument.generated_at >= today)
         )
         or 0,
         closed_this_month=_count(db, *area, Complaint.closed_at >= month),
@@ -270,6 +277,31 @@ def dashboard(db: Session, officer: Principal) -> DashboardOut:
             for s in targets
         ],
         recommendations=l2_recommendation_service.latest(db, limit=4),
+        statistics=_statistics(db, officer, since=today - timedelta(days=365)),
+    )
+
+
+def _statistics(db: Session, officer: Principal, *, since: datetime) -> AreaStatistics:
+    """The area over the last 12 months: the most common categories and how decided cases turned out."""
+    area = [*_in_area(officer), Complaint.forwarded_at >= since]
+    categories = db.execute(
+        select(ComplaintCategory.name, func.count())
+        .join(Complaint, Complaint.category_id == ComplaintCategory.id)
+        .where(*area)
+        .group_by(ComplaintCategory.name)
+        .order_by(func.count().desc(), ComplaintCategory.name)
+        .limit(5)
+    ).all()
+    outcomes = db.execute(
+        select(CaseDecision.outcome, func.count())
+        .join(Complaint, Complaint.id == CaseDecision.complaint_id)
+        .where(*area, Complaint.decided_at.is_not(None))
+        .group_by(CaseDecision.outcome)
+    ).all()
+    return AreaStatistics(
+        cases=_count(db, *area),
+        categories=[CategoryCount(name=name, count=n) for name, n in categories],
+        outcomes={outcome.value: n for outcome, n in outcomes},
     )
 
 
@@ -286,21 +318,21 @@ def _user_name(db: Session, user_id: int | None) -> str:
 
 
 def _earlier(db: Session, c: Complaint) -> list[EarlierCase]:
-    """Earlier cases of this area against the same vehicle or the same person, with what was decided.
+    """Earlier cases against the same vehicle or the same person, with what was decided.
 
-    Only cases that reached Level 2 are listed (not drafts, incomplete or rejected ones), and only the officer's own
-    area, so a case is never shown to an officer who could not open it.
+    Only cases that reached Level 2 are listed (not drafts, incomplete or rejected ones). Drivers and conductors
+    work across areas, so cases of other areas are listed too, as a summary only: the officer cannot open them.
     """
     same = [Complaint.vehicle_id == c.vehicle_id]
     if c.subject_person_id:
         same.append(Complaint.subject_person_id == c.subject_person_id)
     rows = db.execute(
-        select(Complaint, CaseDecision)
+        select(Complaint, CaseDecision, Area.name)
         .outerjoin(CaseDecision, CaseDecision.complaint_id == Complaint.id)
+        .outerjoin(Area, Area.id == Complaint.area_id)
         .where(
             or_(*same),
             Complaint.id != c.id,
-            Complaint.area_id == c.area_id,
             Complaint.status.in_(ROUTED),
             Complaint.registered_at < c.registered_at,
         )
@@ -314,10 +346,12 @@ def _earlier(db: Session, c: Complaint) -> list[EarlierCase]:
             subject=e.subject,
             status=e.status,
             registered_at=e.registered_at,
+            area=area,
+            own_area=e.area_id == c.area_id,
             action=d.action if d else None,
             outcome=d.outcome if d else None,
         )
-        for e, d in rows
+        for e, d, area in rows
     ]
 
 
@@ -325,7 +359,7 @@ def _history(db: Session, complaint_id: int) -> list[HistoryEntry]:
     rows = db.execute(
         select(AuditLog, User.full_name)
         .outerjoin(User, User.id == AuditLog.actor_user_id)
-        .where(AuditLog.complaint_id == complaint_id)
+        .where(AuditLog.complaint_id == complaint_id, AuditLog.action.not_in(FILE_VIEWS))  # views would crowd it
         .order_by(AuditLog.id)
     ).all()
     return [
@@ -485,7 +519,6 @@ def record_decision(db: Session, officer: Principal, complaint_id: int, body: De
     decision.outcome = body.outcome
     decision.reasoning = body.reasoning.strip()
     decision.decided_at = now  # no AI suggestion was asked for, so ai_followed stays empty
-    c.decided_at = c.decided_at or now  # the first decision ends the decide-by target; a change does not restart it
     db.flush()
     audit_service.record(
         db, officer, action="decision.update" if previous else "decision.create", entity_type="case_decisions",
@@ -511,11 +544,15 @@ def create_solution_document(
 
     now = datetime.now(LOCAL)
     verdict = f"{ACTION_LABEL[decision.action]}. The complaint is {OUTCOME_LABEL[decision.outcome]}."
+    target = _name(db, ComplaintTargetType, c.target_type_id)
+    accused = _name(db, Person, c.subject_person_id, "full_name") or c.subject_person_text
     pdf = solution_pdf.render(
         reference=c.reference_number,
         area=_name(db, Area, c.area_id) or "",
         vehicle=_name(db, Vehicle, c.vehicle_id, "vehicle_number") or c.vehicle_number_entered or "",
-        officer=officer.name,
+        route=_name(db, RouteStand, c.route_stand_id) or "",
+        against=" – ".join(filter(None, [target, accused])) or "Not named",
+        officer=_user_name(db, decision.decided_by_user_id),
         generated_at=now,
         summary=body.summary.strip(),
         verdict=verdict,
@@ -523,9 +560,9 @@ def create_solution_document(
         solution_details=body.solution_details.strip(),
     )
     stored = Path("solution-documents") / str(c.id) / f"{uuid4().hex}.pdf"
-    target = storage_root() / stored
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(pdf)
+    file = storage_root() / stored
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_bytes(pdf)
     try:
         document = SolutionDocument(
             complaint_id=c.id,
@@ -538,6 +575,7 @@ def create_solution_document(
         )
         db.add(document)
         db.flush()
+        c.decided_at = now  # the decision is final now, which ends the decide-by target
         _move(
             db, officer, c, ComplaintStatus.AWAITING_IMPLEMENTATION, "solution_document.create",
             details={"solution_document_id": document.id},
@@ -545,29 +583,46 @@ def create_solution_document(
         db.commit()
     except Exception:
         db.rollback()
-        target.unlink(missing_ok=True)  # no row points at the file, so do not leave it behind
+        file.unlink(missing_ok=True)  # no row points at the file, so do not leave it behind
         raise
     return _detail(db, c)
 
 
 def escalate(db: Session, officer: Principal, complaint_id: int, body: EscalateBody) -> CaseDetail:
-    """Pass the case to Level 3 with a reason (UC-L2-07). It leaves the officer's action list for good."""
+    """Pass the case to Level 3 with a reason (UC-L2-07). It leaves the officer's action list for good.
+
+    A recorded decision is only a draft until the solution document exists, so it does not stop the escalation.
+    It is withdrawn, since Level 3 records its own, and the audit entry keeps what it said.
+    """
     c = _find(db, officer, complaint_id, lock=True)
     _must_be_deciding(c)
-    if db.scalar(select(CaseDecision.id).where(CaseDecision.complaint_id == c.id)):
-        raise ComplaintError(
-            409, "already_decided", "A decision is already recorded. Create the solution document instead."
-        )
+    _start_review(db, officer, c)
     reason = body.reason.strip()
     now = datetime.now(LOCAL)
+    draft = db.scalar(select(CaseDecision).where(CaseDecision.complaint_id == c.id))
+    withdrawn = None
+    if draft:
+        withdrawn = {"action": draft.action.value, "outcome": draft.outcome.value, "reasoning": draft.reasoning}
+        db.delete(draft)
     db.add(Escalation(complaint_id=c.id, escalated_by_user_id=officer.id, reason=reason, escalated_at=now))
     c.escalated_at = now
-    _move(db, officer, c, ComplaintStatus.ESCALATED, "complaint.escalate", reason=reason)
+    _move(
+        db, officer, c, ComplaintStatus.ESCALATED, "complaint.escalate", reason=reason,
+        details={"withdrawn_decision": withdrawn} if withdrawn else None,
+    )
     db.commit()
     return _detail(db, c)
 
 
 # ---------------------------------------------------------------- files
+
+
+def _record_view(db: Session, officer: Principal, action: str, entity_type: str, entity_id: int, complaint_id: int) -> None:
+    """Opening a file shows personal data, so who opened what is kept in the audit trail."""
+    audit_service.record(
+        db, officer, action=action, entity_type=entity_type, entity_id=entity_id, complaint_id=complaint_id
+    )
+    db.commit()
 
 
 def attachment_file(db: Session, officer: Principal, complaint_id: int, attachment_id: int) -> tuple[Path, str, str]:
@@ -582,12 +637,18 @@ def attachment_file(db: Session, officer: Principal, complaint_id: int, attachme
     )
     if attachment is None:
         raise ComplaintError(404, "not_found", "That attachment does not exist.")
-    return storage_root() / attachment.storage_path, attachment.file_name, attachment.mime_type
+    path = storage_root() / attachment.storage_path
+    if path.is_file():
+        _record_view(db, officer, "attachment.view", "complaint_attachments", attachment.id, complaint_id)
+    return path, attachment.file_name, attachment.mime_type
 
 
 def solution_document_file(db: Session, officer: Principal, complaint_id: int) -> tuple[Path, str]:
     c = _find(db, officer, complaint_id)
-    path = db.scalar(select(SolutionDocument.pdf_path).where(SolutionDocument.complaint_id == c.id))
-    if path is None:
+    document = db.scalar(select(SolutionDocument).where(SolutionDocument.complaint_id == c.id))
+    if document is None:
         raise ComplaintError(404, "not_found", "This case has no solution document yet.")
-    return storage_root() / path, f"Solution document {c.reference_number}.pdf"
+    path = storage_root() / document.pdf_path
+    if path.is_file():
+        _record_view(db, officer, "solution_document.view", "solution_documents", document.id, c.id)
+    return path, f"Solution document {c.reference_number}.pdf"

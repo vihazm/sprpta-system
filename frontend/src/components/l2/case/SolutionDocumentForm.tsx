@@ -10,15 +10,32 @@ import { createSolutionDocument } from "../api";
 import { ACTION_LABEL, LIMITS, OUTCOME_LABEL } from "../format";
 import type { CaseDetail } from "../types";
 
-// The solution document (UC-L2-05). The case ID and the verdict come from the case and the decision; the summary
-// starts from the complaint and can be edited; the officer writes what the implementing staff must do. Creating
-// it generates the PDF and moves the case to Awaiting implementation, after which nothing here can be edited.
-export function SolutionDocumentForm({ c, onChange }: { c: CaseDetail; onChange: (c: CaseDetail) => void }) {
-  const [summary, setSummary] = useState(() => [c.subject, c.description].filter(Boolean).join(". "));
+// The complaint as a starting summary, cut at a word so it fits what the server accepts.
+function startingSummary(c: CaseDetail): string {
+  const text = [c.subject, c.description].filter(Boolean).join(". ");
+  if (text.length <= LIMITS.summary) return text;
+  const cut = text.slice(0, LIMITS.summary - 1);
+  return `${cut.slice(0, cut.lastIndexOf(" ") > 0 ? cut.lastIndexOf(" ") : cut.length)}…`;
+}
+
+// The solution document (UC-L2-05). The case ID and the verdict come from the case and the saved decision; the
+// summary starts from the complaint and can be edited; the officer writes what the implementing staff must do.
+// Creating it generates the PDF and moves the case to Awaiting implementation, after which nothing can be edited.
+export function SolutionDocumentForm({
+  c,
+  unsaved,
+  onChange,
+}: {
+  c: CaseDetail;
+  unsaved: boolean; // the decision above has changes that are not saved yet
+  onChange: (c: CaseDetail) => void;
+}) {
+  const [summary, setSummary] = useState(() => startingSummary(c));
   const [details, setDetails] = useState("");
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const decision = c.decision!;
+  const ready = summary.trim() !== "" && details.trim() !== "" && summary.length <= LIMITS.summary;
 
   async function create() {
     setBusy(true);
@@ -68,14 +85,11 @@ export function SolutionDocumentForm({ c, onChange }: { c: CaseDetail; onChange:
       </Field>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f1ebed] pt-3.5">
         <p className={`${muted} max-w-[28rem]`}>
-          The document cannot be edited after it is created, and the decision can no longer be changed.
+          {unsaved
+            ? "Save your changes to the decision first: the document is made from the saved decision."
+            : "The document cannot be edited after it is created, and the decision can no longer be changed."}
         </p>
-        <PillButton
-          primary
-          className="!h-11 !px-6"
-          disabled={busy || !summary.trim() || !details.trim()}
-          onClick={() => setAsking(true)}
-        >
+        <PillButton primary className="!h-11 !px-6" disabled={busy || unsaved || !ready} onClick={() => setAsking(true)}>
           <Icon name="file" size={14} />
           Create solution document
         </PillButton>

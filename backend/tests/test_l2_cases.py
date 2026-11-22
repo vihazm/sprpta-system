@@ -190,6 +190,7 @@ def test_the_solution_document_needs_a_decision_and_moves_the_case_on(client, db
     assert (area.tmp / stored.pdf_path).read_bytes().startswith(b"%PDF-")
     pdf = client.get(f"{URL}/{case.id}/solution-document")
     assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf"
+    assert db.scalar(select(AuditLog.id).where(AuditLog.action == "solution_document.view")) is not None
 
     assert error_code(decide(client, case.id)) == "not_deciding"
     assert error_code(client.post(f"{URL}/{case.id}/solution-document", json=body)) == "not_deciding"
@@ -208,10 +209,34 @@ def test_escalating_needs_a_reason_and_ends_the_officers_part(client, db, area):
     assert error_code(decide(client, case.id)) == "not_deciding"
 
 
-def test_a_decided_case_cannot_be_escalated(client, db, area):
+def test_escalating_withdraws_a_draft_decision_and_keeps_it_in_the_audit_trail(client, db, area):
     case = forwarded(db, area)
-    decide(client, case.id)
-    assert error_code(client.post(f"{URL}/{case.id}/escalate", json={"reason": "Too hard."})) == "already_decided"
+    decide(client, case.id, reasoning="First thought.")
+    escalated = client.post(f"{URL}/{case.id}/escalate", json={"reason": "Beyond my powers."}).json()
+    assert escalated["status"] == "escalated" and escalated["decision"] is None
+    row = db.scalar(select(AuditLog).where(AuditLog.complaint_id == case.id, AuditLog.action == "complaint.escalate"))
+    assert row.from_status == ComplaintStatus.UNDER_REVIEW
+    assert row.details["withdrawn_decision"]["reasoning"] == "First thought."
+
+
+def test_a_case_level_three_decided_carries_no_target_for_level_two(client, db, area):
+    case = forwarded(db, area, severity=area.critical, age=timedelta(days=5))
+    client.post(f"{URL}/{case.id}/escalate", json={"reason": "Beyond my powers."})
+    db.refresh(case)
+    case.status = ComplaintStatus.AWAITING_IMPLEMENTATION  # as Level 3 leaves it after its own decision
+    db.commit()
+    detail = client.get(f"{URL}/{case.id}").json()
+    assert detail["due_kind"] is None and detail["overdue"] is False
+    assert detail["escalation"] is not None
+
+
+def test_escalating_an_unopened_case_passes_through_under_review(client, db, area):
+    case = forwarded(db, area)
+    client.post(f"{URL}/{case.id}/escalate", json={"reason": "Beyond my powers."})
+    moves = db.scalars(
+        select(AuditLog.to_status).where(AuditLog.complaint_id == case.id).order_by(AuditLog.id)
+    ).all()
+    assert moves == [ComplaintStatus.UNDER_REVIEW, ComplaintStatus.ESCALATED]
 
 
 # ---------------------------------------------------------------- dashboard and recommendations
@@ -242,6 +267,34 @@ def test_recommendations_are_read_only_and_filterable(client, db, area):
     detail = client.get(f"/api/l2/recommendations/{page['items'][0]['id']}").json()
     assert detail["entered_by"] == "Office Staff" and detail["details"] == "Helped a wheelchair user."
     assert client.put(f"/api/l2/recommendations/{detail['id']}", json={"status": "acknowledged"}).status_code == 405
+
+
+def test_recommendations_can_be_found_by_the_commended_person(client, db, area):
+    person = Person(full_name="Sunil Jayasena", person_type=PersonType.CONDUCTOR)
+    db.add(person)
+    db.flush()
+    db.add(
+        Recommendation(
+            recommendation_type=RecommendationType.COMMENDATION, title="Very kind", details="Helped an old man.",
+            subject_person_id=person.id, entered_by_user_id=area.l1.id,
+        )
+    )
+    db.commit()
+    page = client.get("/api/l2/recommendations", params={"search": "jayasena"}).json()
+    assert [r["title"] for r in page["items"]] == ["Very kind"]
+
+
+def test_the_dashboard_shows_the_areas_categories_and_outcomes(client, db, area):
+    decided = forwarded(db, area)
+    forwarded(db, area)
+    forwarded(db, area, area=area.matara, vehicle=area.other_bus)
+    decide(client, decided.id, outcome="partly_substantiated")
+    client.post(f"{URL}/{decided.id}/solution-document", json={"summary": "s", "solution_details": "d"})
+
+    stats = client.get("/api/l2/dashboard").json()["statistics"]
+    assert stats["cases"] == 2
+    assert stats["categories"] == [{"name": "Reckless driving", "count": 2}]
+    assert stats["outcomes"] == {"partly_substantiated": 1}
 
 
 # ---------------------------------------------------------------- access and isolation
@@ -298,26 +351,28 @@ def test_another_areas_officer_cannot_reach_or_change_a_case(client, db, area):
 # ---------------------------------------------------------------- overdue, decided cases and severities
 
 
-def test_a_decided_case_is_judged_by_its_close_by_target_not_decide_by(client, db, area):
+def test_decide_by_ends_with_the_solution_document_not_the_draft_decision(client, db, area):
     case = forwarded(db, area, severity=area.critical, age=timedelta(days=2))  # past decide-by (1 day), inside close-by (3)
-    assert client.get(f"{URL}/{case.id}").json()["overdue"] is True
-
     decide(client, case.id)
+    detail = client.get(f"{URL}/{case.id}").json()
+    assert detail["overdue"] is True and detail["due_kind"] == "decide"  # a draft decision does not stop the clock
+
+    client.post(f"{URL}/{case.id}/solution-document", json={"summary": "s", "solution_details": "d"})
     detail = client.get(f"{URL}/{case.id}").json()
     assert detail["overdue"] is False and detail["due_kind"] == "close"
     board = client.get("/api/l2/dashboard").json()
     assert board["urgent"] == 0 and board["next_case_id"] is None and board["overdue"] == []
+    assert board["decided_today"] == 1 and board["average_decide_days"] == 2.0
     assert client.get(URL, params={"status": "overdue"}).json()["total"] == 0
 
 
-def test_a_changed_decision_does_not_restart_the_clock(client, db, area):
+def test_changing_a_decision_does_not_count_as_deciding_another_case(client, db, area):
     case = forwarded(db, area)
     decide(client, case.id)
-    db.refresh(case)
-    first = case.decided_at
     decide(client, case.id, action="warning")
     db.refresh(case)
-    assert case.decided_at == first
+    assert case.decided_at is None
+    assert client.get("/api/l2/dashboard").json()["decided_today"] == 0
 
 
 def test_severity_comes_from_the_rank_so_a_renamed_severity_still_works(client, db, area):
@@ -332,7 +387,7 @@ def test_severity_comes_from_the_rank_so_a_renamed_severity_still_works(client, 
 # ---------------------------------------------------------------- what the case shows
 
 
-def test_earlier_cases_are_routed_cases_of_the_same_area_only(client, db, area):
+def test_earlier_cases_include_other_areas_as_summaries(client, db, area):
     person = Person(full_name="Kasun", person_type=PersonType.DRIVER)
     db.add(person)
     db.flush()
@@ -346,9 +401,13 @@ def test_earlier_cases_are_routed_cases_of_the_same_area_only(client, db, area):
     current = forwarded(db, area, subject_person_id=person.id)
 
     earlier = client.get(f"{URL}/{current.id}").json()["earlier"]
-    assert [e["id"] for e in earlier] == [routed.id]
+    assert {e["id"]: (e["own_area"], e["area"]) for e in earlier} == {
+        routed.id: (True, "Galle"),
+        elsewhere.id: (False, "Matara"),
+    }
     shown = {e["reference_number"] for e in earlier}
-    assert not shown & {elsewhere.reference_number, rejected.reference_number, incomplete.reference_number}
+    assert not shown & {rejected.reference_number, incomplete.reference_number}
+    assert client.get(f"{URL}/{elsewhere.id}").status_code == 404  # listed, but still not open to this officer
 
 
 def test_the_case_shows_the_level_one_details_level_two_needs(client, db, area):
@@ -398,7 +457,12 @@ def test_attachments_open_only_for_their_own_case_and_are_never_sniffed(client, 
     assert client.get(f"{URL}/{case.id}/attachments/{removed.id}").status_code == 404
     assert client.get(f"{URL}/{other.id}/attachments/{shown.id}").status_code == 404
     assert error_code(client.get(f"{URL}/{case.id}/attachments/{lost.id}")) == "file_missing"
-    assert [a["id"] for a in client.get(f"{URL}/{case.id}").json()["attachments"]] == [shown.id, lost.id]
+    detail = client.get(f"{URL}/{case.id}").json()
+    assert [a["id"] for a in detail["attachments"]] == [shown.id, lost.id]
+
+    views = db.scalars(select(AuditLog).where(AuditLog.action == "attachment.view")).all()
+    assert [(v.entity_id, v.actor_user_id) for v in views] == [(shown.id, area.officer.id)]  # a missing file is not a view
+    assert all(h["action"] != "attachment.view" for h in detail["history"])
 
 
 def test_the_solution_document_handles_sinhala_tamil_emoji_and_long_text(client, db, area):

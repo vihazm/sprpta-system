@@ -5,7 +5,7 @@ import { Icon } from "@/components/dashboard/icons";
 import { Note } from "@/components/dashboard/Note";
 import { OverdueBadge } from "@/components/dashboard/OverdueBadge";
 import { SeverityChip } from "@/components/dashboard/severity";
-import { Card, PillLink, muted } from "@/components/dashboard/ui";
+import { Card, PillButton, PillLink, muted } from "@/components/dashboard/ui";
 import { startReview } from "../api";
 import { dateTime, dueText } from "../format";
 import { isDeciding, StatusTag } from "../status";
@@ -16,20 +16,30 @@ import { ComplaintDetails } from "./ComplaintDetails";
 import { DecisionStep } from "./DecisionStep";
 
 // One case (UI-L2-03): its details, what the officer can do at its status, earlier cases and its history.
-// Opening a Forwarded case moves it to Under review, which the History panel then shows.
-export function CaseReview({ initial }: { initial: CaseDetail }) {
+// Opening a Forwarded case moves it to Under review, which the History panel then shows. A case opened from
+// another case's earlier complaints is only being looked at, so it stays Forwarded until the officer starts it.
+export function CaseReview({ initial, openedFrom = null }: { initial: CaseDetail; openedFrom?: string | null }) {
   const [c, setCase] = useState(initial);
   const [reviewError, setReviewError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
-    if (started.current || initial.status !== "forwarded") return;
+    if (started.current || openedFrom || initial.status !== "forwarded") return;
     started.current = true;
     void startReview(initial.id).then((result) => {
       if (result.ok) setCase(result.data);
       else setReviewError(result.message);
     });
-  }, [initial]);
+  }, [initial, openedFrom]);
+
+  async function review() {
+    setStarting(true);
+    const result = await startReview(c.id);
+    setStarting(false);
+    if (result.ok) setCase(result.data);
+    else setReviewError(result.message);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -62,6 +72,17 @@ export function CaseReview({ initial }: { initial: CaseDetail }) {
             </div>
           )}
         </div>
+        {openedFrom && c.status === "forwarded" && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f7f4f5] px-4 py-3">
+            <p className={muted}>
+              Opened from {openedFrom} for reference, so it is still Forwarded. Start the review when you are ready to
+              work on it.
+            </p>
+            <PillButton primary disabled={starting} onClick={review}>
+              Start review
+            </PillButton>
+          </div>
+        )}
         {reviewError && <Note tone="alert">The case could not be moved to Under review: {reviewError}</Note>}
       </Card>
 

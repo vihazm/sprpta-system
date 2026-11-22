@@ -118,12 +118,12 @@ export function RecommendationsList({ initial }: { initial?: RecommendationPage 
                 <Icon name="bulb" size={17} />
               </span>
               <span className="min-w-[12rem] flex-1">
-                <span className="block text-[0.84rem] font-extrabold">{r.title}</span>
-                <span className={muted}>
+                <span className="block text-[0.95rem] font-extrabold">{r.title}</span>
+                <span className="text-[0.86rem] leading-[1.45] text-muted">
                   {RECOMMENDATION_TYPE_LABEL[r.type]} · received {shortDate(r.receivedDate ?? r.createdAt)}
                 </span>
               </span>
-              <Chip tone={RECOMMENDATION_TONE[r.status]}>{RECOMMENDATION_STATUS_LABEL[r.status]}</Chip>
+              <Chip tone={RECOMMENDATION_TONE[r.status]} large>{RECOMMENDATION_STATUS_LABEL[r.status]}</Chip>
             </Link>
           </li>
         ))}

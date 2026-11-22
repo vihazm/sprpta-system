@@ -37,10 +37,12 @@ def list_recommendations(
         base.append(Recommendation.recommendation_type == recommendation_type)
     term = search.strip()
     if term:
+        commended = select(Person.id).where(Person.full_name.icontains(term, autoescape=True))
         base.append(
             or_(
                 Recommendation.title.icontains(term, autoescape=True),
                 Recommendation.details.icontains(term, autoescape=True),
+                Recommendation.subject_person_id.in_(commended),
             )
         )
     rows = db.execute(
