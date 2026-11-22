@@ -32,10 +32,10 @@ export const STATUS_STYLE: Record<CaseStatus, string> = {
 export const isDeciding = (status: CaseStatus) => status === "forwarded" || status === "under_review";
 
 /** The status tag shown on every case (shared component, UI Flow 7). */
-export function StatusTag({ status }: { status: CaseStatus }) {
+export function StatusTag({ status, large = false }: { status: CaseStatus; large?: boolean }) {
   return (
     <span
-      className={`inline-flex whitespace-nowrap rounded-full px-[0.7rem] py-[0.25rem] text-[0.72rem] font-bold ${STATUS_STYLE[status]}`}
+      className={`inline-flex whitespace-nowrap rounded-full px-[0.7rem] py-[0.25rem] font-bold ${large ? "text-[0.8rem]" : "text-[0.72rem]"} ${STATUS_STYLE[status]}`}
     >
       {STATUS_LABEL[status]}
     </span>

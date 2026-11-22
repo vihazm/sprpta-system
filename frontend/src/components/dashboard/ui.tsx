@@ -25,10 +25,10 @@ export const eyebrow = "text-[0.69rem] font-bold uppercase tracking-[0.09em] tex
 export const muted = "text-[0.78rem] leading-[1.45] text-muted";
 export const bigNumber = "font-display leading-none tracking-[-0.035em] tabular-nums";
 
-export function Chip({ tone = "info", children }: { tone?: ChipTone; children: ReactNode }) {
+export function Chip({ tone = "info", large = false, children }: { tone?: ChipTone; large?: boolean; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-full px-[0.7rem] py-[0.25rem] text-[0.72rem] font-bold ${CHIP_STYLES[tone]}`}
+      className={`inline-flex items-center gap-[0.35rem] whitespace-nowrap rounded-full px-[0.7rem] py-[0.25rem] font-bold ${large ? "text-[0.8rem]" : "text-[0.72rem]"} ${CHIP_STYLES[tone]}`}
     >
       {children}
     </span>

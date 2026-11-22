@@ -105,7 +105,7 @@ function span(ms: number): string {
 
 /** The next time target in words: "Decide in 5 h", "Overdue by 3 h", "With Level 3". */
 export function dueText(c: Pick<CaseRow, "status" | "dueKind" | "dueAt" | "overdue">): string {
-  if (!c.dueKind || !c.dueAt) return c.status === "escalated" ? "With Level 3" : c.status === "closed" ? "Closed" : "–";
+  if (!c.dueKind || !c.dueAt) return c.status === "closed" ? "Closed" : "With Level 3"; // only escalated cases have no target
   const left = new Date(c.dueAt).getTime() - Date.now();
   if (c.overdue || left < 0) return `Overdue by ${span(left)}`;
   return `${c.dueKind === "decide" ? "Decide" : "Close"} in ${span(left)}`;

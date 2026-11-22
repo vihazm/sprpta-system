@@ -63,17 +63,31 @@ class RecommendationRow(BaseModel):
     created_at: datetime
 
 
+class CategoryCount(BaseModel):
+    name: str
+    count: int
+
+
+class AreaStatistics(BaseModel):
+    """The officer's area over the last 12 months."""
+
+    cases: int  # forwarded to the area
+    categories: list[CategoryCount]  # the five most common
+    outcomes: dict[str, int]  # decided cases (solution document created) per outcome
+
+
 class DashboardOut(BaseModel):
     counts: dict[str, int]  # the area's cases per status, plus "all" and "overdue"
     arrived_today: int  # forwarded to the area today
-    decided_today: int  # decisions this officer recorded today
+    decided_today: int  # solution documents this officer created today
     closed_this_month: int
     urgent: int  # critical cases still waiting for a decision
     next_case_id: int | None  # the most urgent case waiting for a decision
     overdue: list[CaseRow]
-    average_decide_days: float | None  # this month, from registration to decision
+    average_decide_days: float | None  # this month, from registration to the solution document
     targets: list[TimeTarget]
     recommendations: list[RecommendationRow]
+    statistics: AreaStatistics
 
 
 # ---------------------------------------------------------------- one case
@@ -92,6 +106,8 @@ class EarlierCase(BaseModel):
     subject: str | None
     status: ComplaintStatus
     registered_at: datetime | None
+    area: str | None
+    own_area: bool  # a case of another area is shown as a summary and cannot be opened
     action: DecisionAction | None
     outcome: DecisionOutcome | None
 

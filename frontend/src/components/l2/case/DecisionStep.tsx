@@ -15,8 +15,9 @@ import { SolutionDocumentForm } from "./SolutionDocumentForm";
 const ACTIONS = Object.entries(ACTION_LABEL).map(([key, value]) => ({ key: key as DecisionAction, value }));
 const OUTCOMES = Object.entries(OUTCOME_LABEL).map(([key, value]) => ({ key: key as DecisionOutcome, value }));
 
-// Deciding the case (UC-L2-04), then the solution document (UC-L2-05), or escalating it (UC-L2-07). The officer
-// decides on their own: the AI suggestion is added once the AI model exists. Nothing is chosen in advance.
+// Deciding the case (UC-L2-04), then the solution document (UC-L2-05), or escalating it (UC-L2-07) at any point
+// before the document exists. The officer decides on their own: the AI suggestion is added once the AI model
+// exists. Nothing is chosen in advance.
 export function DecisionStep({ c, onChange }: { c: CaseDetail; onChange: (c: CaseDetail) => void }) {
   const [action, setAction] = useState<DecisionAction | null>(c.decision?.action ?? null);
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(c.decision?.outcome ?? null);
@@ -30,6 +31,7 @@ export function DecisionStep({ c, onChange }: { c: CaseDetail; onChange: (c: Cas
     action === c.decision.action &&
     outcome === c.decision.outcome &&
     reasoning.trim() === c.decision.reasoning;
+  const unsaved = c.decision !== null && !unchanged; // the solution document is made from the saved decision only
 
   async function save() {
     if (!action || !outcome) return;
@@ -56,7 +58,7 @@ export function DecisionStep({ c, onChange }: { c: CaseDetail; onChange: (c: Cas
       <Card>
         <CardHeading
           title="Your decision"
-          subtitle="All fields are required. You can change the decision until the solution document is created."
+          subtitle="All fields are required. You can change the decision, or still escalate, until the solution document is created."
         />
         <Field label="Action">
           <ChoiceGroup
@@ -88,22 +90,21 @@ export function DecisionStep({ c, onChange }: { c: CaseDetail; onChange: (c: Cas
         <p className={muted}>The outcome later counts towards the accused person&apos;s rating.</p>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#f1ebed] pt-3.5">
-          {c.decision ? (
-            <span className={muted}>Escalating is no longer possible once a decision is recorded.</span>
-          ) : (
-            <PillButton className="!border-crimson !text-crimson-hover" disabled={busy} onClick={() => setEscalating(true)}>
-              <Icon name="up" size={14} />
-              Escalate to Level 3
-            </PillButton>
-          )}
-          <PillButton primary className="!h-11 !px-6" disabled={busy || !complete || unchanged} onClick={save}>
-            <Icon name="check" size={14} />
-            {c.decision ? "Save changes" : "Record decision"}
+          <PillButton className="!border-crimson !text-crimson-hover" disabled={busy} onClick={() => setEscalating(true)}>
+            <Icon name="up" size={14} />
+            Escalate to Level 3
           </PillButton>
+          <div className="flex flex-wrap items-center gap-3">
+            {unsaved && <span className={muted}>You have unsaved changes.</span>}
+            <PillButton primary className="!h-11 !px-6" disabled={busy || !complete || unchanged} onClick={save}>
+              <Icon name="check" size={14} />
+              {c.decision ? "Save changes" : "Record decision"}
+            </PillButton>
+          </div>
         </div>
       </Card>
 
-      {c.decision && <SolutionDocumentForm c={c} onChange={onChange} />}
+      {c.decision && <SolutionDocumentForm c={c} unsaved={unsaved} onChange={onChange} />}
 
       {escalating && (
         <ConfirmDialog
@@ -117,6 +118,7 @@ export function DecisionStep({ c, onChange }: { c: CaseDetail; onChange: (c: Cas
         >
           Escalate only when the case cannot be resolved within your area. The status becomes Escalated and the case
           leaves your action list. It does not come back.
+          {c.decision && " Your recorded decision is withdrawn, since Level 3 makes its own. The History keeps it."}
         </ConfirmDialog>
       )}
     </>

@@ -1,6 +1,7 @@
 import { api, type ApiResult } from "@/lib/api-client";
 import type { Severity } from "@/components/dashboard/severity";
 import type {
+  AreaStatistics,
   CaseDetail,
   CasePage,
   CaseQuery,
@@ -87,6 +88,7 @@ export async function loadDashboard(): Promise<ApiResult<DashboardData>> {
     average_decide_days: number | null;
     targets: { severity: string; forward_days: number; decide_days: number; close_days: number }[];
     recommendations: RecommendationIn[];
+    statistics: AreaStatistics;
   }>("/api/l2/dashboard");
   return mapData(result, (b) => ({
     counts: b.counts,
@@ -104,6 +106,7 @@ export async function loadDashboard(): Promise<ApiResult<DashboardData>> {
       closeDays: t.close_days,
     })),
     recommendations: b.recommendations.map(toRecommendation),
+    statistics: b.statistics, // its fields are single words, so the shape is the same on both sides
   }));
 }
 
@@ -150,6 +153,8 @@ type CaseDetailIn = CaseRowIn & {
     subject: string | null;
     status: string;
     registered_at: string | null;
+    area: string | null;
+    own_area: boolean;
     action: DecisionAction | null;
     outcome: DecisionOutcome | null;
   }[];
@@ -212,6 +217,8 @@ function toDetail(c: CaseDetailIn): CaseDetail {
       subject: e.subject,
       status: e.status,
       registeredAt: e.registered_at,
+      area: e.area,
+      ownArea: e.own_area,
       action: e.action,
       outcome: e.outcome,
     })),

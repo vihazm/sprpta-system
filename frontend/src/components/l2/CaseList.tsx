@@ -24,10 +24,11 @@ const SEVERITIES: (Severity | null)[] = [null, "critical", "high", "medium", "lo
 const columnsFor = (wide: boolean) =>
   `grid items-center gap-3 ${
     wide
-      ? "grid-cols-[9.75rem_minmax(0,1fr)_4.5rem_4.75rem_10.5rem_8.5rem]"
+      ? "grid-cols-[10.5rem_minmax(0,1fr)_5.5rem_5.25rem_11.5rem_9.5rem]"
       : "grid-cols-[9.75rem_minmax(0,1fr)_4.75rem_10.5rem_8.5rem]"
   }`;
-const th ="text-[0.69rem] font-bold uppercase tracking-[0.07em] text-muted";
+const th = (wide: boolean) =>
+  `${wide ? "text-[0.76rem]" : "text-[0.69rem]"} font-bold uppercase tracking-[0.07em] text-muted`;
 
 // The area's cases (UI-L2-02), searchable and filterable by status, severity and Overdue. On the dashboard a row
 // picks the case shown beside the list (onSelect); on the Cases page a row opens the case.
@@ -145,14 +146,14 @@ export function CaseList({
       {answer?.error && <Note tone="alert">{answer.error}</Note>}
 
       <div className="overflow-x-auto">
-        <div className={`${wide ? "min-w-[52rem]" : "min-w-[46rem]"} transition-opacity ${loading ? "opacity-60" : ""}`}>
+        <div className={`${wide ? "min-w-[58rem]" : "min-w-[46rem]"} transition-opacity ${loading ? "opacity-60" : ""}`}>
           <div className={`${columnsFor(wide)} px-3 pb-1`}>
-            <span className={th}>Reference</span>
-            <span className={th}>Subject</span>
-            {wide && <span className={th}>Forwarded</span>}
-            <span className={th}>Severity</span>
-            <span className={th}>Status</span>
-            <span className={th}>Next target</span>
+            <span className={th(wide)}>Reference</span>
+            <span className={th(wide)}>Subject</span>
+            {wide && <span className={th(wide)}>Forwarded</span>}
+            <span className={th(wide)}>Severity</span>
+            <span className={th(wide)}>Status</span>
+            <span className={th(wide)}>Next target</span>
           </div>
           <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
             {data?.items.map((c) => (
@@ -213,27 +214,37 @@ function Row({
   }`;
   const cells = (
     <>
-      <b className="whitespace-nowrap text-[0.75rem] font-extrabold text-crimson-hover">{c.reference}</b>
+      <b className={`whitespace-nowrap font-extrabold text-crimson-hover ${wide ? "text-[0.85rem]" : "text-[0.75rem]"}`}>
+        {c.reference}
+      </b>
       <span className="min-w-0">
-        <span className="block truncate text-[0.81rem] font-bold">{c.subject ?? "No subject"}</span>
-        <span className="text-[0.69rem] font-bold text-muted">{c.vehicle ?? "No vehicle"}</span>
+        <span className={`block truncate font-bold ${wide ? "text-[1rem]" : "text-[0.81rem]"}`}>
+          {c.subject ?? "No subject"}
+        </span>
+        <span className={`font-bold text-muted ${wide ? "text-[0.78rem]" : "text-[0.69rem]"}`}>
+          {c.vehicle ?? "No vehicle"}
+        </span>
       </span>
-      {wide && <span className="text-[0.75rem] font-bold text-slate-600">{dayMonth(c.forwardedAt)}</span>}
+      {wide && <span className="text-[0.85rem] font-bold text-slate-600">{dayMonth(c.forwardedAt)}</span>}
       <span>
-        <SeverityChip severity={c.severity} />
+        <SeverityChip severity={c.severity} large={wide} />
       </span>
       <span className="flex flex-wrap items-center gap-1.5">
-        <StatusTag status={c.status} />
-        {c.overdue && <OverdueBadge />}
+        <StatusTag status={c.status} large={wide} />
+        {c.overdue && <OverdueBadge large={wide} />}
       </span>
       <span className="min-w-0">
         <span
           suppressHydrationWarning // counted from the current time, which moves on between server and browser
-          className={`block text-[0.75rem] font-extrabold ${c.overdue ? "text-red-800" : "text-slate-600"}`}
+          className={`block font-extrabold ${wide ? "text-[0.85rem]" : "text-[0.75rem]"} ${c.overdue ? "text-red-800" : "text-slate-600"}`}
         >
           {dueText(c)}
         </span>
-        {c.dueAt && <span className="text-[0.69rem] font-bold text-muted">{dayMonthTime(c.dueAt)}</span>}
+        {c.dueAt && (
+          <span className={`font-bold text-muted ${wide ? "text-[0.78rem]" : "text-[0.69rem]"}`}>
+            {dayMonthTime(c.dueAt)}
+          </span>
+        )}
       </span>
     </>
   );
