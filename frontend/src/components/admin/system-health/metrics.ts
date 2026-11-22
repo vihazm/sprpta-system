@@ -26,7 +26,6 @@ export function buildMetrics(data: SystemHealthData): ServiceMetric[] {
 
 // Services that cannot be checked yet, and what each is waiting for.
 export const PENDING_SERVICES = [
-  { name: "File storage", waitingFor: "Shows free space once documents can be uploaded." },
   { name: "AI service", waitingFor: "Shows answer times once the AI module is connected." },
   { name: "SMS and email", waitingFor: "Shows sent and failed messages once messaging is connected." },
 ];

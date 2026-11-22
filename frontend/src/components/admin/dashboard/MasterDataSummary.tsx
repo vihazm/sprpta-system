@@ -1,6 +1,6 @@
 import { formatNumber, plural } from "./format";
 import type { AdminDashboardData } from "./types";
-import { Card, CardHeading, Chip } from "@/components/dashboard/ui";
+import { Card, CardHeading, Chip, LinkButton } from "@/components/dashboard/ui";
 
 function Tile({ label, value, tint }: { label: string; value: number; tint: string }) {
   return (
@@ -20,7 +20,11 @@ export function MasterDataSummary({
 }) {
   return (
     <Card className={`gap-3 ${className}`}>
-      <CardHeading title="Master data" subtitle="Records in the system" />
+      <CardHeading
+        title="Master data"
+        subtitle="Active records"
+        action={<LinkButton href="/admin/master-data">Open</LinkButton>}
+      />
       <div className="grid grid-cols-2 gap-2">
         <div className="col-span-2 flex items-baseline justify-between rounded-[1.1rem] bg-crimson/10 px-[0.9rem] py-3">
           <span className="text-[0.78rem] font-bold">People</span>

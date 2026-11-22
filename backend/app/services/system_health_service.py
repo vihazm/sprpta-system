@@ -1,9 +1,12 @@
 """Figures for the administrator's System health page (UI-AD-07).
 
 Everything is read from the readings that health_check_service saves, plus a few
-live numbers from the database server. Each function is one or two queries.
+live numbers from the database server, the free space of the disk that holds the
+evidence files, and the result the backup script records. Each function is one or two
+queries.
 """
 
+import shutil
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, literal_column, select, text
@@ -11,15 +14,18 @@ from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from app.core.timezone import LOCAL, LOCAL_TIMEZONE
-from app.models import HealthCheck, HealthEvent, UsageLog, User
+from app.models import ComplaintAttachment, HealthCheck, HealthEvent, SystemSetting, UsageLog, User
 from app.schemas.system_health import (
+    Backup,
     DatabaseStats,
+    FileStorage,
     HealthEventOut,
     Outage,
     ServiceStatus,
     SystemHealth,
     Uptime,
 )
+from app.services.complaint_attachment_service import storage_root
 from app.services.health_check_service import INTERVAL_SECONDS, SERVICE_NAMES, STARTED_AT
 
 UPTIME_DAYS = 30
@@ -28,6 +34,9 @@ EVENTS_SHOWN = 8
 FAILED_SIGN_INS_TO_REPORT = 5
 # A reading older than this is not shown as current: the checks may have stopped.
 STALE_AFTER = timedelta(seconds=INTERVAL_SECONDS * 3)
+LOW_SPACE_SHARE = 0.1  # file storage is low when less than this share of the disk is free
+LAST_BACKUP_KEY = "backup.last_run"  # written by app/scripts/backup.py
+BACKUP_DUE = timedelta(hours=26)  # a daily backup, with two hours to spare
 
 EVENT_TITLES = {
     "ok": "{name} is back to normal",
@@ -168,6 +177,38 @@ def _events(db: Session, now: datetime) -> list[HealthEventOut]:
     return sorted(events, key=lambda e: e.occurred_at, reverse=True)[:EVENTS_SHOWN]
 
 
+def file_storage(db: Session) -> FileStorage:
+    folder = storage_root()
+    while not folder.exists():  # the folder is made by the first upload; until then measure the disk it will be on
+        folder = folder.parent
+    disk = shutil.disk_usage(folder)
+    files, size = db.execute(
+        select(func.count(), func.coalesce(func.sum(ComplaintAttachment.size_bytes), 0)).select_from(ComplaintAttachment)
+    ).one()
+    return FileStorage(
+        total_bytes=disk.total,
+        free_bytes=disk.free,
+        low=disk.free < disk.total * LOW_SPACE_SHARE,
+        evidence_files=files,
+        evidence_bytes=size,
+    )
+
+
+def last_backup(db: Session, now: datetime) -> Backup | None:
+    setting = db.get(SystemSetting, LAST_BACKUP_KEY)
+    if setting is None:
+        return None
+    run = setting.value
+    finished = datetime.fromisoformat(run["finished_at"])
+    return Backup(
+        finished_at=finished,
+        succeeded=run["succeeded"],
+        size_bytes=run.get("size_bytes"),
+        error=run.get("error"),
+        stale=now - finished > BACKUP_DUE,
+    )
+
+
 def build_system_health(db: Session) -> SystemHealth:
     now = datetime.now(UTC)
     return SystemHealth(
@@ -178,4 +219,6 @@ def build_system_health(db: Session) -> SystemHealth:
         database=_database_stats(db),
         api_started_at=STARTED_AT,
         events=_events(db, now),
+        file_storage=file_storage(db),
+        last_backup=last_backup(db, now),
     )

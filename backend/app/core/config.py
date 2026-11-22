@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # --- evidence files; a relative folder is inside backend/ ---
     upload_dir: str = "uploads"
 
+    # --- daily backups (see app/scripts/backup.py); a relative folder is inside backend/ ---
+    backup_dir: str = "backups"
+    backup_keep: int = 14  # the newest backups kept; older ones are deleted
+    pg_dump_path: str = "pg_dump"  # the full path when pg_dump is not on PATH
+
     # --- lockout and rate limiting ---
     max_failed_logins: int = 5
     lockout_minutes: int = 15

@@ -1,5 +1,6 @@
+import Link from "next/link";
 import type { AttentionItem, Tone } from "./types";
-import { Card, Chip, PillButton, StatusDot, TONE_BG, muted } from "@/components/dashboard/ui";
+import { Card, Chip, PillLink, StatusDot, TONE_BG, muted } from "@/components/dashboard/ui";
 
 const TONE_LABEL: Record<Tone, string> = {
   crit: "Critical",
@@ -78,27 +79,31 @@ export function NeedsAttention({ items, className = "" }: { items: AttentionItem
             </p>
             <p className="mt-[0.2rem] text-[0.97rem] font-extrabold leading-[1.3]">{urgent.title}</p>
             <p className={`mt-1 ${muted}`}>{urgent.detail}</p>
-            {urgent.action && (
-              <PillButton primary className="mt-3">
-                {urgent.action}
-              </PillButton>
-            )}
+            <PillLink href={urgent.href} primary className="mt-3">
+              {urgent.action}
+            </PillLink>
           </div>
         </div>
       )}
 
+      {items.length === 0 && (
+        <p className={muted}>Every area has an officer, the services are healthy and the last backup worked.</p>
+      )}
+
       <ul className="flex list-none flex-col p-0">
         {others.map((item) => (
-          <li
-            key={item.title}
-            className="flex items-center gap-3 border-t border-slate-100 py-[0.65rem] first:border-t-0 first:pt-0"
-          >
-            <StatusDot tone={item.tone} />
-            <div className="min-w-0 flex-1">
-              <p className="text-[0.85rem] font-bold leading-[1.3]">{item.title}</p>
-              <p className={muted}>{item.detail}</p>
-            </div>
-            <ChevronIcon />
+          <li key={item.title} className="border-t border-slate-100 first:border-t-0">
+            <Link
+              href={item.href}
+              className="focus-ring flex items-center gap-3 rounded-lg py-[0.65rem] hover:bg-[#fbf5f6]"
+            >
+              <StatusDot tone={item.tone} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.85rem] font-bold leading-[1.3]">{item.title}</p>
+                <p className={muted}>{item.detail}</p>
+              </div>
+              <ChevronIcon />
+            </Link>
           </li>
         ))}
       </ul>
