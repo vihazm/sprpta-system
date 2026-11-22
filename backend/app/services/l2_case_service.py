@@ -116,7 +116,8 @@ def _due_at():
     return type_coerce(due, DateTime(timezone=True))
 
 
-def _overdue():
+def overdue():
+    """True for a case past the target of its current stage. Needs Severity joined. Also used by the statistics."""
     return func.coalesce(_due_at() < func.now(), false())
 
 
@@ -163,14 +164,14 @@ def _counts(db: Session, conditions: list) -> dict[str, int]:
     counts = {status.value: 0 for status in ROUTED}
     counts.update({status.value: n for status, n in rows})
     counts["all"] = sum(counts.values())
-    counts["overdue"] = _count(db, *conditions, _overdue())
+    counts["overdue"] = _count(db, *conditions, overdue())
     return counts
 
 
 def _rows(db: Session, conditions: list, *, sort: CaseSort, limit: int, offset: int = 0) -> list[CaseRow]:
     due = _due_at()
     order = (
-        [_overdue().desc(), due.asc().nulls_last(), Severity.rank, Complaint.id]
+        [overdue().desc(), due.asc().nulls_last(), Severity.rank, Complaint.id]
         if sort == "urgent"
         else [Complaint.forwarded_at.desc(), Complaint.id.desc()]
     )
@@ -227,7 +228,7 @@ def list_cases(
         )
     counts = _counts(db, base)
     if status == "overdue":
-        base.append(_overdue())
+        base.append(overdue())
     elif status:
         base.append(Complaint.status == ComplaintStatus(status))
 
@@ -263,7 +264,7 @@ def dashboard(db: Session, officer: Principal) -> DashboardOut:
         closed_this_month=_count(db, *area, Complaint.closed_at >= month),
         urgent=_count(db, *waiting, Severity.rank == 1),
         next_case_id=next_case[0].id if next_case else None,
-        overdue=_rows(db, [*area, _overdue()], sort="urgent", limit=5),
+        overdue=_rows(db, [*area, overdue()], sort="urgent", limit=5),
         average_decide_days=round(float(average) / 86400, 1) if average is not None else None,
         targets=[
             TimeTarget(severity=severity_key(s.rank), forward_days=s.forward_days, decide_days=s.decide_days, close_days=s.close_days)
