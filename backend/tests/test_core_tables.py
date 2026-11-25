@@ -73,6 +73,7 @@ EXPECTED_COLUMNS = {
         "client_request_id",  # added by migration 0006, so that a retried save cannot create a second complaint
         "target_type_id",  # added by migration 0007: who the complaint is against
         "complainant_type", "bus_verification", "synthetic_batch_id",  # added by migration 0009
+        "withdrawn_at",  # added by migration 0011: a portal complaint its complainant deleted
     ],
     "complaint_attachments": [
         "id", "complaint_id", "file_name", "storage_path", "mime_type", "size_bytes", "description",
