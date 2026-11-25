@@ -308,7 +308,7 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
         <EvidencePicker picked={files} onChange={setFiles} disabled={busy} />
       </Section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] bg-white/95 px-5 py-3.5 shadow-[0_18px_40px_-16px_rgba(60,20,30,0.35),0_0_0_1px_rgba(60,20,30,0.06)] backdrop-blur-md">
         <p className={`max-w-[26rem] ${muted}`}>
           Your name and contact come from your account. Severity and vehicle details are confirmed by SPRPTA staff.
         </p>

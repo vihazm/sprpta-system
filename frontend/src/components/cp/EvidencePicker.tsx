@@ -107,14 +107,14 @@ export function EvidencePicker({
       )}
 
       {picked.length > 0 && (
-        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-2.5 p-0">
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-3 p-0">
           {picked.map((p, i) => (
-            <li key={`${p.file.name}-${i}`} className="flex items-center gap-3 rounded-[1rem] bg-[#f7f4f5] p-2.5">
+            <li key={`${p.file.name}-${i}`} className="flex items-center gap-3.5 rounded-[1.1rem] bg-[#f7f4f5] p-3">
               {p.preview ? (
                 // eslint-disable-next-line @next/next/no-img-element -- a temporary preview of a file on this computer
-                <img src={p.preview} alt="" className="size-[2.9rem] flex-none rounded-[0.7rem] object-cover" />
+                <img src={p.preview} alt="" className="size-[4.2rem] flex-none rounded-[0.8rem] object-cover" />
               ) : (
-                <span className="grid size-[2.9rem] flex-none place-items-center rounded-[0.7rem] bg-white text-crimson">
+                <span className="grid size-[4.2rem] flex-none place-items-center rounded-[0.8rem] bg-white text-crimson">
                   <Icon name="file" size={20} />
                 </span>
               )}

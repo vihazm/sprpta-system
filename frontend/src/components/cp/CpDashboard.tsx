@@ -157,7 +157,7 @@ function LatestUpdate({ complaint }: { complaint: PortalComplaint }) {
         View
       </Link>
       {complaint.attachments.length > 0 && (
-        <ul className="m-0 flex w-full list-none flex-wrap gap-2 border-t border-[#efe9eb] p-0 pt-3.5" aria-label="Files you added">
+        <ul className="m-0 flex w-full list-none flex-wrap gap-2.5 border-t border-[#efe9eb] p-0 pt-3.5" aria-label="Files you added">
           {complaint.attachments.slice(0, 6).map((a) => (
             <li key={a.id}>
               <a
@@ -166,19 +166,19 @@ function LatestUpdate({ complaint }: { complaint: PortalComplaint }) {
                 rel="noopener"
                 aria-label={`Open ${a.fileName}`}
                 title={a.fileName}
-                className="focus-ring grid size-[3.2rem] place-items-center overflow-hidden rounded-[0.8rem] bg-[#f7f4f5] text-crimson"
+                className="focus-ring grid size-[5.2rem] place-items-center overflow-hidden rounded-[1rem] bg-[#f7f4f5] text-crimson"
               >
                 {isImage(a.mimeType) ? (
                   // eslint-disable-next-line @next/next/no-img-element -- the person's own upload, served by the API
                   <img src={fileUrl(complaint.id, a.id)} alt="" loading="lazy" className="size-full object-cover" />
                 ) : (
-                  <Icon name="file" size={20} />
+                  <Icon name="file" size={26} />
                 )}
               </a>
             </li>
           ))}
           {complaint.attachments.length > 6 && (
-            <li className="grid size-[3.2rem] place-items-center rounded-[0.8rem] bg-[#f7f4f5] text-[0.76rem] font-bold text-muted">
+            <li className="grid size-[5.2rem] place-items-center rounded-[1rem] bg-[#f7f4f5] text-[0.8rem] font-bold text-muted">
               +{complaint.attachments.length - 6}
             </li>
           )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { Card, Chip, PillButton, eyebrow, muted } from "@/components/dashboard/ui";
 import { notify } from "@/lib/notify";
@@ -22,6 +22,7 @@ export function MyComplaints({ complaints: initial, selectedId }: { complaints: 
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const current = complaints.find((c) => c.id === picked) ?? complaints[0];
+  const inProgress = complaints.filter((c) => c.outcome === "open").length;
 
   function setFiles(id: number, attachments: PortalAttachment[]) {
     setComplaints((list) => list.map((c) => (c.id === id ? { ...c, attachments } : c)));
@@ -44,15 +45,27 @@ export function MyComplaints({ complaints: initial, selectedId }: { complaints: 
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <p className={eyebrow}>My complaints</p>
-        <h1 className="mt-1.5 font-display text-[2.3rem] leading-[1.08] tracking-[-0.035em] max-[599px]:text-[1.8rem]">
-          Follow each step
-        </h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className={eyebrow}>My complaints</p>
+          <h1 className="mt-1.5 font-display text-[2.3rem] leading-[1.08] tracking-[-0.035em] max-[599px]:text-[1.8rem]">
+            Follow each step
+          </h1>
+          <p className={`mt-2 ${muted}`}>
+            {complaints.length} {complaints.length === 1 ? "complaint" : "complaints"} · {inProgress} in progress
+          </p>
+        </div>
+        <Link
+          href="/cp/new-complaint"
+          className="focus-ring inline-flex h-11 items-center rounded-[0.95rem] bg-crimson px-5 text-[0.88rem] font-extrabold text-white transition-colors hover:bg-crimson-hover"
+        >
+          New complaint
+        </Link>
       </div>
 
       <div className="flex flex-wrap items-start gap-5">
-        <Card className="flex-[1_1_20rem] !gap-2.5">
+        <Card className="flex-[1_1_20rem] !gap-3">
+          <h2 className="font-display text-[1.15rem] leading-[1.2]">Your complaints</h2>
           <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
             {complaints.map((c) => (
               <li key={c.id}>
@@ -79,8 +92,8 @@ export function MyComplaints({ complaints: initial, selectedId }: { complaints: 
           </ul>
         </Card>
 
-        <Card className="flex-[1.7_1_26rem] !gap-6 !p-[1.9rem]">
-          <div className="flex flex-wrap items-start justify-between gap-2.5">
+        <Card className="flex-[1.7_1_26rem] !gap-0 !p-0">
+          <div className="flex flex-wrap items-start justify-between gap-2.5 px-[1.9rem] pb-5 pt-[1.9rem]">
             <div className="min-w-0 flex-[1_1_16rem]">
               <p className={eyebrow}>{referenceText(current)}</p>
               <h2 className="mt-1.5 font-display text-[1.6rem] leading-[1.2]">{current.subject}</h2>
@@ -90,36 +103,43 @@ export function MyComplaints({ complaints: initial, selectedId }: { complaints: 
             </Chip>
           </div>
 
-          <StatusTimeline complaint={current} />
-
-          <div className="rounded-[1.1rem] bg-[#f7f4f5] px-[1.1rem] py-[0.95rem]">
-            <p className="text-[0.88rem] font-extrabold">{next.title}</p>
-            <p className={`mt-1 ${muted}`}>{next.detail}</p>
-          </div>
-
-          <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(9.5rem,1fr))] gap-4">
-            <Detail label="Submitted" value={formatDate(current.submittedAt)} />
-            <Detail label="Incident date" value={formatDate(current.complaintDate)} />
-            <Detail label="Complaint about" value={current.targetName} />
-            <Detail label="Category" value={current.categoryName} />
-            <Detail label="Vehicle" value={current.vehicleNumber} />
-            <Detail label="Area" value={current.areaName} />
-            <Detail label="Route or stand" value={current.routeStandName} />
-          </dl>
-          {current.description && (
-            <div>
-              <p className={eyebrow}>What you wrote</p>
-              <p className="mt-1.5 whitespace-pre-wrap text-[0.88rem] leading-[1.55] text-slate-ink">{current.description}</p>
+          <Block title="Progress">
+            <StatusTimeline complaint={current} />
+            <div className="rounded-[1.1rem] bg-[#f7f4f5] px-[1.1rem] py-[0.95rem]">
+              <p className="text-[0.88rem] font-extrabold">{next.title}</p>
+              <p className={`mt-1 ${muted}`}>{next.detail}</p>
             </div>
+          </Block>
+
+          <Block title="Details">
+            <dl className="m-0 grid grid-cols-[repeat(auto-fit,minmax(10rem,1fr))] gap-x-5 gap-y-4">
+              <Detail label="Submitted" value={formatDate(current.submittedAt)} />
+              <Detail label="Incident date" value={formatDate(current.complaintDate)} />
+              <Detail label="Complaint about" value={current.targetName} />
+              <Detail label="Category" value={current.categoryName} />
+              <Detail label="Vehicle" value={current.vehicleNumber} />
+              <Detail label="Area" value={current.areaName} />
+              <Detail label="Route or stand" value={current.routeStandName} />
+            </dl>
+          </Block>
+
+          {current.description && (
+            <Block title="What you wrote">
+              <p className="m-0 whitespace-pre-wrap text-[0.9rem] leading-[1.6] text-slate-ink">{current.description}</p>
+            </Block>
           )}
-          <AttachmentGallery
-            key={current.id}
-            complaintId={current.id}
-            attachments={current.attachments}
-            editable={current.canDelete}
-            onChange={(next) => setFiles(current.id, next)}
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efe9eb] pt-3">
+
+          <Block title="Evidence">
+            <AttachmentGallery
+              key={current.id}
+              complaintId={current.id}
+              attachments={current.attachments}
+              editable={current.canDelete}
+              onChange={(next) => setFiles(current.id, next)}
+            />
+          </Block>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efe9eb] px-[1.9rem] py-4">
             <p className={`m-0 max-w-[26rem] ${muted}`}>
               Updates about this case reach you by SMS or email. Staff notes and internal steps are not shown here.
             </p>
@@ -141,6 +161,16 @@ export function MyComplaints({ complaints: initial, selectedId }: { complaints: 
         </ConfirmDialog>
       )}
     </div>
+  );
+}
+
+/** One titled section of the complaint card, set off by a line. */
+function Block({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-4 border-t border-[#efe9eb] px-[1.9rem] py-5">
+      <h3 className="m-0 text-[0.69rem] font-bold uppercase tracking-[0.09em] text-muted">{title}</h3>
+      {children}
+    </section>
   );
 }
 
