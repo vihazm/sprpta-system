@@ -15,6 +15,7 @@ import {
 } from "@/lib/validators";
 import { FieldError } from "./FieldError";
 import { ModeToggle } from "./ModeToggle";
+import { PasswordInput } from "./PasswordInput";
 
 const inputClass =
   "h-[3.1rem] w-full rounded-[0.95rem] border-[1.5px] border-transparent bg-field px-[1.05rem] text-[0.96rem] font-medium text-ink outline-none transition placeholder:text-[#6F7682] focus:border-crimson focus:bg-white focus:shadow-[0_0_0_0.25rem_rgba(179,17,47,0.12)] aria-[invalid=true]:border-error aria-[invalid=true]:bg-[#FFF6F5]";
@@ -25,7 +26,6 @@ export function LoginSheet() {
   const [mode, setMode] = useState<AuthMode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [identifierTouched, setIdentifierTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
@@ -122,30 +122,16 @@ export function LoginSheet() {
               Forgot password?
             </Link>
           </div>
-          <div className="relative">
-            <input
-              id="login-password"
-              className={`${inputClass} pr-16`}
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-              }}
-              onBlur={() => setPasswordTouched(true)}
-              aria-invalid={!!passwordError}
-              aria-describedby="login-password-err"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="focus-ring absolute right-[0.3rem] top-[0.3rem] h-[2.4rem] min-w-[2.9rem] cursor-pointer rounded-[0.6rem] bg-transparent text-[0.78rem] font-bold text-muted"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
+          <PasswordInput
+            id="login-password"
+            value={password}
+            onChange={setPassword}
+            onBlur={() => setPasswordTouched(true)}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            invalid={!!passwordError}
+            describedBy="login-password-err"
+          />
           <FieldError id="login-password-err" message={passwordError} />
         </div>
 

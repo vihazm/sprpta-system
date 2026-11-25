@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { FieldError } from "@/components/login/FieldError";
 import { ModeToggle } from "@/components/login/ModeToggle";
+import { PasswordInput } from "@/components/login/PasswordInput";
 import { notify } from "@/lib/notify";
 import { resendCode, signUp, verifyCode } from "@/lib/signup-client";
 import {
@@ -191,15 +192,14 @@ export function SignUpFlow() {
                 <label htmlFor="su-password" className="text-[0.84rem] font-bold">
                   Password
                 </label>
-                <input
+                <PasswordInput
                   id="su-password"
-                  className={inputClass}
-                  type="password"
-                  autoComplete="new-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  aria-invalid={!!shown(errors.password)}
-                  aria-describedby="su-password-err"
+                  onChange={setPassword}
+                  autoComplete="new-password"
+                  placeholder="At least 8 characters"
+                  invalid={!!shown(errors.password)}
+                  describedBy="su-password-err"
                 />
                 <FieldError id="su-password-err" message={shown(errors.password)} />
               </div>
@@ -207,15 +207,14 @@ export function SignUpFlow() {
                 <label htmlFor="su-confirm" className="text-[0.84rem] font-bold">
                   Confirm password
                 </label>
-                <input
+                <PasswordInput
                   id="su-confirm"
-                  className={inputClass}
-                  type="password"
-                  autoComplete="new-password"
                   value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  aria-invalid={!!shown(errors.confirm)}
-                  aria-describedby="su-confirm-err"
+                  onChange={setConfirm}
+                  autoComplete="new-password"
+                  placeholder="Type it again"
+                  invalid={!!shown(errors.confirm)}
+                  describedBy="su-confirm-err"
                 />
                 <FieldError id="su-confirm-err" message={shown(errors.confirm)} />
               </div>
