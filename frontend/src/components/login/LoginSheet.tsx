@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { signIn } from "@/lib/auth-client";
 import { notify } from "@/lib/notify";
 import { safeNextPath } from "@/lib/roles";
@@ -14,6 +14,8 @@ import {
   type AuthMode,
 } from "@/lib/validators";
 import { FieldError } from "./FieldError";
+import { ModeToggle } from "./ModeToggle";
+import { PasswordInput } from "./PasswordInput";
 
 const inputClass =
   "h-[3.1rem] w-full rounded-[0.95rem] border-[1.5px] border-transparent bg-field px-[1.05rem] text-[0.96rem] font-medium text-ink outline-none transition placeholder:text-[#6F7682] focus:border-crimson focus:bg-white focus:shadow-[0_0_0_0.25rem_rgba(179,17,47,0.12)] aria-[invalid=true]:border-error aria-[invalid=true]:bg-[#FFF6F5]";
@@ -24,7 +26,6 @@ export function LoginSheet() {
   const [mode, setMode] = useState<AuthMode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [identifierTouched, setIdentifierTouched] = useState(false);
   const [passwordTouched, setPasswordTouched] = useState(false);
 
@@ -80,58 +81,7 @@ export function LoginSheet() {
         onSubmit={onSubmit}
         className="mt-[1.35rem] flex flex-col gap-[1.1rem]"
       >
-        <div
-          role="group"
-          aria-label="Sign in with"
-          className="relative grid grid-cols-2 rounded-full bg-field p-[0.3rem]"
-        >
-          <span
-            aria-hidden="true"
-            className={`absolute bottom-[0.3rem] left-[0.3rem] top-[0.3rem] w-[calc(50%-0.3rem)] rounded-full bg-ink transition-transform duration-[280ms] ease-[cubic-bezier(.3,.9,.3,1)] ${
-              isEmail ? "" : "translate-x-full"
-            }`}
-          />
-          <ToggleButton
-            active={isEmail}
-            label="Email"
-            onClick={() => pickMode("email")}
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="5" width="18" height="14" rx="2.5" />
-              <path d="M3.5 7l8.5 6 8.5-6" />
-            </svg>
-          </ToggleButton>
-          <ToggleButton
-            active={!isEmail}
-            label="Phone"
-            onClick={() => pickMode("phone")}
-          >
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
-              <path d="M11 18.5h2" />
-            </svg>
-          </ToggleButton>
-        </div>
+        <ModeToggle mode={mode} onChange={pickMode} label="Sign in with" />
 
         <div className="flex flex-col gap-[0.45rem]">
           <label
@@ -172,30 +122,16 @@ export function LoginSheet() {
               Forgot password?
             </Link>
           </div>
-          <div className="relative">
-            <input
-              id="login-password"
-              className={`${inputClass} pr-16`}
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-              }}
-              onBlur={() => setPasswordTouched(true)}
-              aria-invalid={!!passwordError}
-              aria-describedby="login-password-err"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="focus-ring absolute right-[0.3rem] top-[0.3rem] h-[2.4rem] min-w-[2.9rem] cursor-pointer rounded-[0.6rem] bg-transparent text-[0.78rem] font-bold text-muted"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
+          <PasswordInput
+            id="login-password"
+            value={password}
+            onChange={setPassword}
+            onBlur={() => setPasswordTouched(true)}
+            autoComplete="current-password"
+            placeholder="Enter your password"
+            invalid={!!passwordError}
+            describedBy="login-password-err"
+          />
           <FieldError id="login-password-err" message={passwordError} />
         </div>
 
@@ -234,31 +170,5 @@ export function LoginSheet() {
         SPRPTA staff accounts are created by the System Administrator.
       </p>
     </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  label,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={`focus-ring relative z-10 flex h-[2.6rem] cursor-pointer items-center justify-center gap-2 rounded-full text-[0.92rem] font-bold transition-colors duration-200 ${
-        active ? "text-white" : "text-muted"
-      }`}
-    >
-      {children}
-      {label}
-    </button>
   );
 }

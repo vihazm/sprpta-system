@@ -23,7 +23,7 @@ LANDING_PATHS: dict[str, str] = {
     UserRole.L3: "/l3/dashboard",
     UserRole.ADMIN: "/admin/dashboard",
     UserRole.IMPLEMENTING_STAFF: "/is/cases",  # IS lands on case search
-    COMPLAINANT_ROLE: "/cp/complaints",  # CP lands on My complaints
+    COMPLAINANT_ROLE: "/cp/dashboard",  # CP lands on the dashboard
 }
 
 

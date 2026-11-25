@@ -40,3 +40,22 @@ export function normaliseIdentifier(mode: AuthMode, raw: string): string {
   const national = digits.replace(/^(?:0|\+94|94)/, "");
   return `+94${national}`;
 }
+
+// ---------------------------------------------------------------- complainant sign-up
+
+export function validateName(value: string): string {
+  return value.trim() ? "" : "Enter your full name.";
+}
+
+/** A new password: the same length rule as the backend (8 to 128 characters). */
+export function validateNewPassword(value: string): string {
+  if (!value) return "Choose a password.";
+  if (value.length < 8) return "Use at least 8 characters.";
+  if (value.length > 128) return "Use 128 characters or fewer.";
+  return "";
+}
+
+export function validateConfirmPassword(password: string, confirm: string): string {
+  if (!confirm) return "Type the password again.";
+  return password === confirm ? "" : "The passwords do not match.";
+}

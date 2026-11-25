@@ -41,6 +41,19 @@ class Settings(BaseSettings):
     ip_failure_limit: int = 20
     ip_failure_window_minutes: int = 10
 
+    # --- complainant sign-up codes (one-time passwords) ---
+    otp_minutes: int = 10  # how long a code works
+    otp_max_attempts: int = 5  # wrong guesses before a new code is needed
+    otp_resend_seconds: int = 60  # wait before another code can be asked for
+
+    # --- email (sign-up codes). Leave SMTP_HOST empty to keep codes in the backend terminal (development only). ---
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""  # shown as the sender; defaults to SMTP_USER
+    smtp_ssl: bool = False  # True for port 465 (implicit SSL); False uses STARTTLS, normally on port 587
+
     # --- cookies and CSRF ---
     cookie_secure: bool | None = None  # None = secure outside development
     allowed_origins: list[str] = Field(
@@ -54,6 +67,10 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         return self.app_env == "development"
+
+    @property
+    def email_configured(self) -> bool:
+        return bool(self.smtp_host and (self.smtp_from or self.smtp_user))
 
     @property
     def secure_cookies(self) -> bool:

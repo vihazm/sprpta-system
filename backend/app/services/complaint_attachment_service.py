@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.timezone import LOCAL
-from app.models import ComplaintAttachment
+from app.models import Complaint, ComplaintAttachment
 from app.schemas.l1_complaints import AttachmentOut
 from app.services import audit_service
 from app.services.auth_service import Principal
@@ -85,6 +85,22 @@ def add_attachment(
     description: str | None,
 ) -> AttachmentOut:
     complaint = find_editable(db, complaint_id)
+    return store_attachment(
+        db, principal, complaint, file=file, file_name=file_name, mime_type=mime_type, description=description
+    )
+
+
+def store_attachment(
+    db: Session,
+    principal: Principal,
+    complaint: Complaint,
+    *,
+    file: BinaryIO,
+    file_name: str,
+    mime_type: str,
+    description: str | None,
+) -> AttachmentOut:
+    """Check the file and attach it to a complaint the caller was already allowed to change (staff or complainant)."""
     extension = EXTENSIONS.get(mime_type)
     if extension is None:
         raise ComplaintError(
@@ -121,7 +137,8 @@ def add_attachment(
         mime_type=mime_type,
         size_bytes=len(content),
         description=(description or "").strip()[:200] or None,
-        uploaded_by_user_id=principal.id,
+        uploaded_by_user_id=principal.id if principal.kind == "staff" else None,
+        uploaded_by_account_id=principal.id if principal.kind == "cp" else None,
     )
     db.add(attachment)
     db.flush()

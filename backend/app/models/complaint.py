@@ -79,6 +79,8 @@ class Complaint(Base):
             "AND contact_email IS NULL)",
             name="anonymous_has_no_contact",
         ),
+        # Only a portal complaint still waiting for Level 1's first check can be withdrawn by its complainant.
+        CheckConstraint("withdrawn_at IS NULL OR status = 'submitted'", name="withdrawn_only_while_submitted"),
         # A retried save of the same new complaint must not create a second one (see create_draft).
         Index(
             "uq_complaints_entered_by_client_request",
@@ -158,6 +160,9 @@ class Complaint(Base):
     done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when the complainant deletes their portal complaint before Level 1 has checked it. The row and its audit
+    # trail stay (the audit trail is append-only); every list leaves it out.
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     paused_since: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))  # set while Incomplete
     paused_total: Mapped[timedelta] = mapped_column(Interval, server_default=text("interval '0'"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

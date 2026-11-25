@@ -51,11 +51,11 @@ def test_staff_login_redirects_by_role(client, db, galle, role, expected):
     assert r.json()["user"]["role"] == role.value
 
 
-def test_complainant_login_goes_to_my_complaints(client, db):
+def test_complainant_login_goes_to_the_dashboard(client, db):
     make_complainant(db, "client@sprpta.test")
     r = sign_in(client, "client@sprpta.test")
     assert r.status_code == 200
-    assert r.json()["redirect_to"] == "/cp/complaints"
+    assert r.json()["redirect_to"] == "/cp/dashboard"
     assert r.json()["user"]["role"] == "cp"
 
 

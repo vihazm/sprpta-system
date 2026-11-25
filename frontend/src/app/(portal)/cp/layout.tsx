@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { PortalShell } from "@/components/portal/PortalShell";
+import { ComplainantShell } from "@/components/cp/ComplainantShell";
 
 // Complainant portal area. Everything under /cp requires the "cp" role.
 export default function ComplainantLayout({ children }: { children: ReactNode }) {
-  return <PortalShell role="cp">{children}</PortalShell>;
+  return <ComplainantShell>{children}</ComplainantShell>;
 }

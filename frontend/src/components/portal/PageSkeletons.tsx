@@ -204,3 +204,29 @@ export function CaseReviewSkeleton() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------- Complainant screens
+
+export function CpDashboardSkeleton() {
+  return (
+    <div className={stack}>
+      <Skeleton className="h-3 w-44" />
+      <Skeleton className="h-[2.6rem] w-80 max-w-full" />
+      <SkeletonCard height="min-h-[5rem]" />
+      <SkeletonGrid cells={[[4, "min-h-[8rem]"], [4, "min-h-[8rem]"], [4, "min-h-[8rem]"]]} />
+      <SkeletonGrid cells={[[8, "min-h-[18rem]"], [4, "min-h-[18rem]"]]} />
+    </div>
+  );
+}
+
+export const CpFormSkeleton = () => <FormCard rows={6} className="max-w-[56rem]" />;
+
+export function CpComplaintsSkeleton() {
+  return (
+    <div className={stack}>
+      <Skeleton className="h-3 w-32" />
+      <Skeleton className="h-[2.4rem] w-64 max-w-full" />
+      <SkeletonGrid cells={[[5, "min-h-[26rem]"], [7, "min-h-[26rem]"]]} />
+    </div>
+  );
+}

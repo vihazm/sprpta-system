@@ -12,6 +12,7 @@ from app.api.routes import (
     admin_system_health,
     admin_users,
     auth,
+    cp_complaints,
     l1_bus_lookup,
     l1_complaints,
     l1_daily_records,
@@ -20,6 +21,7 @@ from app.api.routes import (
     l2_cases,
     l2_dashboard,
     l2_recommendations,
+    portal_signup,
 )
 from app.core.config import settings
 from app.core.csrf import csrf_guard
@@ -47,6 +49,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(portal_signup.router)
+app.include_router(cp_complaints.router)
 app.include_router(admin_dashboard.router)
 app.include_router(admin_system_health.router)
 app.include_router(admin_users.router)

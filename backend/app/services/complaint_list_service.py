@@ -92,7 +92,7 @@ def list_complaints(
     category_id: int | None = None,
     verification: str | None = None,
 ) -> ComplaintPage:
-    base = []
+    base = [Complaint.withdrawn_at.is_(None)]  # a portal complaint its complainant deleted is never listed
     if category_id is not None:
         base.append(Complaint.category_id == category_id)
     if verification == "failed":  # the bus could not be verified against the daily records
