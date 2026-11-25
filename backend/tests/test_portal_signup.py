@@ -164,3 +164,54 @@ def test_asking_too_often_from_one_address_is_stopped(client, monkeypatch, capsy
     monkeypatch.setattr(settings, "ip_failure_limit", 3)
     codes = [sign_up(client, f"p{i}@sprpta.test").status_code for i in range(4)]
     assert codes == [200, 200, 200, 429]
+
+
+# ---------------------------------------------------------------- real email
+
+
+@pytest.fixture
+def mailbox(monkeypatch):
+    """SMTP is set up and the mail server is replaced by a list of what would have been sent."""
+    from app.services import email_sender
+
+    monkeypatch.setattr(settings, "smtp_host", "smtp.test")
+    monkeypatch.setattr(settings, "smtp_user", "sprpta@test.example")
+    sent = []
+    monkeypatch.setattr(email_sender, "send_email", lambda to, subject, text, html=None: sent.append((to, subject, text, html)))
+    return sent
+
+
+def test_with_smtp_set_the_code_is_emailed_and_not_printed(client, db, capsys, mailbox):
+    assert sign_up(client).status_code == 200
+    assert len(mailbox) == 1
+    to, subject, text, html = mailbox[0]
+    code = re.search(r"code is (\d{6})", text).group(1)
+    assert to == EMAIL and "SPRPTA" in subject and code in html
+    assert "sign-up code" not in capsys.readouterr().out
+    assert client.post(VERIFY, json={"identifier": EMAIL, "code": code}).status_code == 200
+
+
+def test_the_message_log_of_an_emailed_code_has_no_code(client, db, mailbox):
+    sign_up(client)
+    code = re.search(r"code is (\d{6})", mailbox[0][2]).group(1)
+    row = db.scalar(select(OutboundMessage))
+    assert row.state == MessageState.SENT and code not in row.body
+
+
+def test_a_mail_server_failure_is_a_clean_error_and_is_logged(client, db, monkeypatch, mailbox):
+    from app.services import email_sender
+
+    def broken(*args, **kwargs):
+        raise email_sender.EmailError("The mail server refused the SMTP user name or password.")
+
+    monkeypatch.setattr(email_sender, "send_email", broken)
+    r = sign_up(client)
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "code_not_sent"
+    row = db.scalar(select(OutboundMessage))
+    assert row.state == MessageState.FAILED and "refused" in row.error_detail
+
+
+def test_a_phone_number_still_prints_its_code_even_when_email_is_set_up(client, capsys, mailbox):
+    assert sign_up(client, "071 234 5678").status_code == 200
+    assert mailbox == []
+    assert "+94712345678" in capsys.readouterr().out

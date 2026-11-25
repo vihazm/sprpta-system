@@ -6,9 +6,9 @@ and signed in. Until then the account cannot log in.
 
 Codes are stored only as a keyed hash, expire after a few minutes, allow a few
 wrong guesses and can be asked for again after a short wait. Delivery is
-"console" for now: the code is printed in the backend terminal. That is only
-allowed in development; anywhere else no code is sent until a real SMS/email
-provider is connected.
+"console" for SMS: the code is printed in the backend terminal. Email goes out through SMTP
+when SMTP_* is set in backend/.env; otherwise it is printed too. Printing is only allowed in
+development; anywhere else no code is sent until a provider is connected.
 """
 
 import hashlib
@@ -24,7 +24,7 @@ from app.core.enums import MessageChannel, MessageState, MessageType
 from app.core.identifiers import normalise_identifier
 from app.core.security import hash_password
 from app.models import ComplainantAccount, OtpCode, OutboundMessage, User
-from app.services import auth_service
+from app.services import auth_service, email_sender
 from app.services.auth_service import IssuedTokens
 
 
@@ -55,14 +55,48 @@ def _hash_code(account_id: int, code: str) -> str:
     return hmac.new(key, f"{account_id}:{code}".encode(), hashlib.sha256).hexdigest()
 
 
+def _email_body(code: str) -> tuple[str, str]:
+    """The plain text and the HTML of the sign-up email."""
+    minutes = settings.otp_minutes
+    text = "\n\n".join(
+        [
+            f"Your SPRPTA verification code is {code}.",
+            f"It works for {minutes} minutes. If you did not ask for it, you can ignore this email.",
+            "Southern Provincial Road Passenger Transport Authority",
+        ]
+    )
+    html = (
+        '<div style="font-family:Arial,sans-serif;max-width:28rem;color:#16181d">'
+        '<p style="margin:0 0 .5rem;font-size:.8rem;letter-spacing:.08em;color:#b3112f;font-weight:bold">SPRPTA</p>'
+        '<p style="margin:0 0 1rem">Your verification code is</p>'
+        f'<p style="margin:0 0 1rem;font-size:2rem;letter-spacing:.3rem;font-weight:bold">{code}</p>'
+        f'<p style="margin:0 0 1rem;color:#5b6574">It works for {minutes} minutes. '
+        "If you did not ask for it, you can ignore this email.</p>"
+        '<p style="margin:0;color:#5b6574;font-size:.85rem">Southern Provincial Road Passenger Transport Authority</p>'
+        "</div>"
+    )
+    return text, html
+
+
+def _send(channel: MessageChannel, recipient: str, code: str) -> str | None:
+    """Send the code. Returns None when it went out, or a short reason when it did not."""
+    if channel is MessageChannel.EMAIL and settings.email_configured:
+        text, html = _email_body(code)
+        try:
+            email_sender.send_email(recipient, "Your SPRPTA verification code", text, html)
+        except email_sender.EmailError as exc:
+            return str(exc)
+        return None
+    if settings.is_development:
+        # Console mode: the code appears in the backend terminal (used for SMS, and for email until SMTP is set up).
+        print(f"[SPRPTA sign-up code] {recipient}: {code}", flush=True)
+        return None
+    return "No SMS or email provider is connected."
+
+
 def _deliver(db: Session, account: ComplainantAccount, channel: MessageChannel, recipient: str, code: str) -> None:
     """Send the code and log the attempt. The log never holds the code itself."""
-    if settings.is_development:
-        # Console mode: the code appears in the backend terminal. Replace with the SMS/email provider later.
-        print(f"[SPRPTA sign-up code] {recipient}: {code}", flush=True)
-        state, error = MessageState.SENT, None
-    else:
-        state, error = MessageState.FAILED, "No SMS or email provider is connected."
+    error = _send(channel, recipient, code)
     db.add(
         OutboundMessage(
             complainant_account_id=account.id,
@@ -70,11 +104,11 @@ def _deliver(db: Session, account: ComplainantAccount, channel: MessageChannel, 
             channel=channel,
             recipient=recipient,
             body="Your SPRPTA verification code is ******.",
-            state=state,
+            state=MessageState.FAILED if error else MessageState.SENT,
             error_detail=error,
         )
     )
-    if state is MessageState.FAILED:
+    if error:
         db.commit()
         raise SignupError(503, "code_not_sent", "We could not send a code right now. Please try again later.")
 
