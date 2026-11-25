@@ -19,13 +19,12 @@ import {
 import { EMPTY_CODE, OtpInput } from "./OtpInput";
 
 const inputClass =
-  "h-[3.1rem] w-full rounded-[0.95rem] border-[1.5px] border-transparent bg-field px-[1.05rem] text-[0.96rem] font-medium text-ink outline-none transition placeholder:text-[#6F7682] focus:border-crimson focus:bg-white focus:shadow-[0_0_0_0.25rem_rgba(179,17,47,0.12)] aria-[invalid=true]:border-error aria-[invalid=true]:bg-[#FFF6F5]";
+  "h-[3.1rem] w-full rounded-[0.95rem] border-[1.5px] border-[#e4dde0] bg-field px-[1.05rem] text-[0.96rem] font-medium text-ink outline-none transition placeholder:text-[#6F7682] focus:border-crimson focus:bg-white focus:shadow-[0_0_0_0.25rem_rgba(179,17,47,0.12)] aria-[invalid=true]:border-error aria-[invalid=true]:bg-[#FFF6F5]";
 const primaryButton =
   "focus-ring flex h-[3.3rem] w-full cursor-pointer items-center justify-center rounded-2xl bg-crimson text-base font-bold text-white shadow-[0_14px_26px_-12px_rgba(179,17,47,0.85)] transition hover:bg-crimson-hover active:translate-y-px disabled:cursor-wait disabled:opacity-70";
 const textButton =
   "focus-ring cursor-pointer rounded-sm border-0 bg-transparent p-0 text-[0.86rem] font-bold text-crimson hover:text-crimson-link-hover disabled:cursor-default disabled:text-muted";
-const eyebrow = "m-0 text-[0.69rem] font-bold uppercase tracking-[0.09em] text-muted";
-const heading = "mb-0 mt-[0.5rem] font-display text-[2.1rem] leading-[1.1] tracking-[-0.03em]";
+const heading = "m-0 font-display text-[2.1rem] leading-[1.12] tracking-[-0.03em] max-[599px]:text-[1.8rem]";
 
 type Step = "details" | "code";
 
@@ -119,11 +118,29 @@ export function SignUpFlow() {
   }
 
   return (
-    <div className="w-full max-w-[33.5rem] rounded-[2rem] bg-white px-[2.5rem] pb-[2rem] pt-[2.4rem] shadow-[0_1px_2px_rgba(60,20,30,0.05),0_30px_60px_-32px_rgba(110,8,30,0.35),0_0_0_1px_rgba(60,20,30,0.03)] max-[599px]:px-[1.3rem] max-[599px]:pb-[1.5rem] max-[599px]:pt-[1.7rem]">
+    <section className="flex flex-col px-[2.9rem] pb-[2.1rem] pt-[2.7rem] max-[899px]:px-[1.4rem] max-[899px]:pb-[1.5rem] max-[899px]:pt-[1.7rem]">
+      <ol className="m-0 mb-[1.6rem] flex list-none items-center gap-[0.6rem] p-0 text-[0.78rem] font-bold" aria-label="Sign-up progress">
+        {["Your details", "Verify code"].map((label, i) => {
+          const current = step === "details" ? 0 : 1;
+          const active = current >= i;
+          return (
+            <li key={label} aria-current={current === i ? "step" : undefined} className="flex items-center gap-[0.6rem]">
+              {i > 0 && <span className={`h-[2px] w-[2.2rem] ${active ? "bg-crimson" : "bg-[#e5e1e3]"}`} />}
+              <span
+                className={`grid size-[1.65rem] place-items-center rounded-full text-[0.74rem] font-extrabold ${
+                  active ? "bg-crimson text-white" : "bg-[#e9e4e6] text-muted"
+                }`}
+              >
+                {i + 1}
+              </span>
+              <span className={active ? "text-crimson" : "text-muted"}>{label}</span>
+            </li>
+          );
+        })}
+      </ol>
       {step === "details" ? (
         <>
-          <p className={eyebrow}>Complainant sign-up</p>
-          <h2 className={heading}>Let us set you up</h2>
+          <h2 className={heading}>Create your account</h2>
           <p className="mb-0 mt-[0.6rem] text-[0.92rem] text-muted">
             One account lets you lodge complaints and watch them move to a result.
           </p>
@@ -218,7 +235,6 @@ export function SignUpFlow() {
         </>
       ) : (
         <>
-          <p className={eyebrow}>Verify</p>
           <h2 className={heading}>Enter the code</h2>
           <p className="mb-0 mt-[0.6rem] text-[0.92rem] text-muted">
             We sent a 6-digit code to <b className="text-ink">{identifier.trim()}</b>. It works for 10 minutes.
@@ -251,6 +267,13 @@ export function SignUpFlow() {
           </div>
         </>
       )}
-    </div>
+      <p className="mb-0 mt-[1.4rem] flex items-center justify-center gap-[0.4rem] border-t border-[#efe9eb] pt-[1rem] text-center text-[0.74rem] text-muted">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="4" y="10.5" width="16" height="10" rx="2.5" />
+          <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+        </svg>
+        Your details are used only to contact you about your complaints.
+      </p>
+    </section>
   );
 }

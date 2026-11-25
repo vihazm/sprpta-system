@@ -7,48 +7,50 @@ const STEPS = [
   { label: "Closed", note: "You are told the case is complete." },
 ];
 
-/** The crimson side of the sign-up page: what happens to a complaint, in the four steps the complainant sees. */
+/** The crimson half of the sign-up card: what the system promises, and the four steps a complaint goes through. */
 export function SignUpPanel() {
   return (
-    <aside className="relative flex flex-col justify-between gap-[2rem] overflow-hidden bg-gradient-to-br from-crimson-deep via-[#A8102F] to-[#cf2a4b] px-[3.2rem] py-[3rem] text-white max-[899px]:px-[1.4rem] max-[899px]:py-[1.6rem]">
+    <section className="relative flex flex-col justify-between gap-[1.8rem] overflow-hidden bg-gradient-to-br from-crimson-deep via-[#A8102F] to-[#cf2a4b] px-[2.7rem] py-[2.7rem] text-white max-[899px]:gap-[1rem] max-[899px]:px-[1.5rem] max-[899px]:py-[1.5rem]">
       <div
         aria-hidden="true"
-        className="absolute -bottom-40 -left-36 size-[30rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.2),transparent_68%)]"
+        className="absolute -right-32 -top-32 size-[22rem] rounded-full bg-[radial-gradient(circle,rgba(255,255,255,0.22),transparent_65%)]"
       />
+
       <div className="relative flex items-center gap-[0.7rem]">
-        <BrandTile size="2.4rem" />
-        <span className="text-[1.05rem] font-extrabold tracking-[0.04em]">SPRPTA</span>
+        <span className="flex size-[2.6rem] flex-none items-center justify-center rounded-[0.8rem] bg-white">
+          <BrandTile size="1.9rem" />
+        </span>
+        <div className="leading-[1.2]">
+          <p className="m-0 text-[1.1rem] font-extrabold tracking-[0.04em]">SPRPTA</p>
+          <p className="m-0 text-[0.76rem] text-white/80 max-[599px]:hidden">Complaint &amp; Recommendation System</p>
+        </div>
       </div>
 
       <div className="relative">
-        <h1 className="m-0 max-w-[10em] font-display text-[2.9rem] leading-[1.1] tracking-[-0.03em] max-[899px]:text-[2rem]">
+        <h1 className="m-0 font-display text-[2.7rem] leading-[1.08] tracking-[-0.03em] max-[899px]:text-[1.9rem]">
           Your complaint, followed to its close.
         </h1>
-        <ol className="m-0 mt-[2rem] list-none p-0 max-[899px]:hidden">
-          {STEPS.map((step, i) => (
-            <li key={step.label} className="flex gap-[1rem]">
-              <div className="flex w-[2.1rem] flex-none flex-col items-center">
-                <span className="grid size-[2.1rem] place-items-center rounded-full bg-white/15 text-[0.86rem] font-extrabold">
-                  {i + 1}
-                </span>
-                {i < STEPS.length - 1 && <span className="min-h-[2rem] w-[3px] flex-1 rounded-full bg-white/20" />}
-              </div>
-              <div className="pb-[1.3rem] pt-[0.3rem]">
-                <p className="m-0 text-[0.94rem] font-extrabold">{step.label}</p>
-                <p className="m-0 mt-[0.2rem] text-[0.82rem] text-white/85">{step.note}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <p className="mb-0 mt-[0.9rem] max-w-[23em] text-[0.92rem] leading-[1.55] text-white/90 max-[899px]:hidden">
+          Report a problem with a bus or trishaw service and see every step until it is resolved.
+        </p>
       </div>
 
-      <div className="relative flex flex-col gap-[0.8rem] max-[899px]:hidden">
-        <div className="rounded-[1.25rem] border border-white/25 bg-white/10 px-[1.1rem] py-[0.9rem]">
-          <p className="m-0 text-[0.7rem] font-bold uppercase tracking-[0.1em] text-[#ffc2cd]">Updates</p>
-          <p className="m-0 mt-[0.25rem] text-[0.88rem] font-bold">Sent to you by SMS or email at every step.</p>
-        </div>
-        <p className="m-0 text-[0.78rem] text-white/80">Bus and trishaw services in Galle, Matara and Hambantota.</p>
-      </div>
-    </aside>
+      <ol className="relative m-0 list-none p-0 max-[899px]:hidden">
+        {STEPS.map((step, i) => (
+          <li key={step.label} className="flex gap-[0.9rem]">
+            <div className="flex w-[1.9rem] flex-none flex-col items-center">
+              <span className="grid size-[1.9rem] place-items-center rounded-full border border-white/45 bg-white/20 text-[0.8rem] font-extrabold">
+                {i + 1}
+              </span>
+              {i < STEPS.length - 1 && <span className="min-h-[1.3rem] w-[2px] flex-1 bg-white/30" />}
+            </div>
+            <div className={i < STEPS.length - 1 ? "pb-[0.9rem] pt-[0.15rem]" : "pt-[0.15rem]"}>
+              <p className="m-0 text-[0.9rem] font-extrabold">{step.label}</p>
+              <p className="m-0 mt-[0.1rem] text-[0.78rem] text-white/82">{step.note}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
