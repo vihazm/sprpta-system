@@ -30,7 +30,7 @@ from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
-from app.core.rate_limit import login_failures  # noqa: E402
+from app.core.rate_limit import login_failures, signup_requests  # noqa: E402
 from app.core.roles import UserRole  # noqa: E402
 from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
@@ -65,6 +65,7 @@ def _database():
 @pytest.fixture(autouse=True)
 def _clean():
     login_failures.reset()
+    signup_requests.reset()
     with SessionLocal() as db:
         db.execute(
             text(
