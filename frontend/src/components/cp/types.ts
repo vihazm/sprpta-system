@@ -2,6 +2,20 @@
 
 export type Outcome = "open" | "closed" | "not_accepted";
 
+export type PortalAttachment = {
+  id: number;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
+export type PortalVehicle = {
+  vehicleNumber: string;
+  vehicleType: string;
+  areaId: number;
+  areaName: string;
+};
+
 export type PortalComplaint = {
   id: number;
   referenceNumber: string | null; // none until Level 1 has registered it
@@ -18,6 +32,8 @@ export type PortalComplaint = {
   routeStandName: string | null;
   vehicleNumber: string | null;
   description: string | null;
+  attachments: PortalAttachment[];
+  canDelete: boolean; // only while Level 1 has not checked it yet
 };
 
 export type Named = { id: number; name: string };

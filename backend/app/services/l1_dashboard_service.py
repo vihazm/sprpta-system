@@ -78,7 +78,7 @@ def dashboard(db: Session, officer: Principal) -> DashboardOut:
     ).all()
     portal = db.scalars(
         select(Complaint)
-        .where(Complaint.status == ComplaintStatus.SUBMITTED)
+        .where(Complaint.status == ComplaintStatus.SUBMITTED, Complaint.withdrawn_at.is_(None))
         .order_by(Complaint.created_at, Complaint.id)
         .limit(PORTAL_LIMIT)
     ).all()
@@ -92,7 +92,7 @@ def dashboard(db: Session, officer: Principal) -> DashboardOut:
         week_entered=_count(db, mine, Complaint.created_at >= monday),
         month_entered=_count(db, mine, Complaint.created_at >= first),
         queues=Queues(
-            portal=_count(db, Complaint.status == ComplaintStatus.SUBMITTED),
+            portal=_count(db, Complaint.status == ComplaintStatus.SUBMITTED, Complaint.withdrawn_at.is_(None)),
             drafts=_count(db, Complaint.status == ComplaintStatus.DRAFT),
             incomplete=_count(db, Complaint.status == ComplaintStatus.INCOMPLETE),
             duplicates=_count(db, Complaint.status.in_(EDITABLE), undecided_duplicate()),

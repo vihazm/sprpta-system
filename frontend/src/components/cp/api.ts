@@ -1,5 +1,5 @@
 import { api, type ApiResult } from "@/lib/api-client";
-import type { ComplaintFields, Outcome, PortalComplaint, PortalOptions } from "./types";
+import type { ComplaintFields, Outcome, PortalAttachment, PortalComplaint, PortalOptions, PortalVehicle } from "./types";
 
 // The calls behind the complainant portal. The API speaks snake_case and the components camelCase, so the
 // conversion happens here and nowhere else.
@@ -22,7 +22,15 @@ type ApiComplaint = {
   route_stand_name: string | null;
   vehicle_number: string | null;
   description: string | null;
+  attachments: { id: number; file_name: string; mime_type: string; size_bytes: number }[];
+  can_delete: boolean;
 };
+
+type ApiAttachment = ApiComplaint["attachments"][number];
+
+function toAttachment(a: ApiAttachment): PortalAttachment {
+  return { id: a.id, fileName: a.file_name, mimeType: a.mime_type, sizeBytes: a.size_bytes };
+}
 
 function toComplaint(c: ApiComplaint): PortalComplaint {
   return {
@@ -41,6 +49,8 @@ function toComplaint(c: ApiComplaint): PortalComplaint {
     routeStandName: c.route_stand_name,
     vehicleNumber: c.vehicle_number,
     description: c.description,
+    attachments: c.attachments.map(toAttachment),
+    canDelete: c.can_delete,
   };
 }
 
@@ -82,4 +92,34 @@ export async function submitComplaint(fields: ComplaintFields): Promise<ApiResul
     },
   });
   return mapData(result, toComplaint);
+}
+
+// ---------------------------------------------------------------- deleting, files and vehicle suggestions
+
+/** Deletes a complaint Level 1 has not checked yet. The record itself stays in the database. */
+export function deleteComplaint(id: number) {
+  return api<null>(`${COMPLAINTS}/${id}`, { method: "DELETE" });
+}
+
+export async function uploadFile(id: number, file: File): Promise<ApiResult<PortalAttachment>> {
+  const body = new FormData();
+  body.append("file", file);
+  return mapData(await api<ApiAttachment>(`${COMPLAINTS}/${id}/attachments`, { method: "POST", body }), toAttachment);
+}
+
+export function removeFile(id: number, fileId: number) {
+  return api<null>(`${COMPLAINTS}/${id}/attachments/${fileId}`, { method: "DELETE" });
+}
+
+/** Where the browser can show or open an uploaded file. Only the owner of the complaint is let in. */
+export const fileUrl = (id: number, fileId: number) => `${COMPLAINTS}/${id}/attachments/${fileId}/file`;
+
+/** Vehicle numbers that start with what has been typed so far. */
+export async function searchVehicles(text: string): Promise<ApiResult<PortalVehicle[]>> {
+  const result = await api<{ vehicle_number: string; vehicle_type: string; area_id: number; area_name: string }[]>(
+    `${COMPLAINTS}/lookup/vehicles?q=${encodeURIComponent(text)}`,
+  );
+  return mapData(result, (rows) =>
+    rows.map((v) => ({ vehicleNumber: v.vehicle_number, vehicleType: v.vehicle_type, areaId: v.area_id, areaName: v.area_name })),
+  );
 }

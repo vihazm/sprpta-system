@@ -89,6 +89,8 @@ def _send(channel: MessageChannel, recipient: str, code: str) -> str | None:
         return None
     if settings.is_development:
         # Console mode: the code appears in the backend terminal (used for SMS, and for email until SMTP is set up).
+        if channel is MessageChannel.EMAIL:
+            print("[SPRPTA] No email was sent: SMTP_HOST and SMTP_USER are not set in backend/.env.", flush=True)
         print(f"[SPRPTA sign-up code] {recipient}: {code}", flush=True)
         return None
     return "No SMS or email provider is connected."

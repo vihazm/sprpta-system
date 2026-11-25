@@ -2,16 +2,42 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Card, Chip, eyebrow, muted } from "@/components/dashboard/ui";
+import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
+import { Card, Chip, PillButton, eyebrow, muted } from "@/components/dashboard/ui";
+import { notify } from "@/lib/notify";
+import { deleteComplaint } from "./api";
+import { AttachmentGallery } from "./AttachmentGallery";
 import { StatusTimeline } from "./StatusTimeline";
 import { StepBar } from "./StepBar";
 import { formatDate, referenceText, statusTone, whatNext } from "./status";
-import type { PortalComplaint } from "./types";
+import type { PortalAttachment, PortalComplaint } from "./types";
 
-/** My complaints (UI-CP-03 and UI-CP-05): pick a complaint, see which of the four steps it is at. Read only. */
-export function MyComplaints({ complaints, selectedId }: { complaints: PortalComplaint[]; selectedId: number | null }) {
+/**
+ * My complaints (UI-CP-03 and UI-CP-05): pick a complaint, see which of the four steps it is at and the files it has.
+ * While SPRPTA has not started on a complaint, its files can be changed and the whole complaint can be deleted.
+ */
+export function MyComplaints({ complaints: initial, selectedId }: { complaints: PortalComplaint[]; selectedId: number | null }) {
+  const [complaints, setComplaints] = useState(initial);
   const [picked, setPicked] = useState<number | null>(selectedId);
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
   const current = complaints.find((c) => c.id === picked) ?? complaints[0];
+
+  function setFiles(id: number, attachments: PortalAttachment[]) {
+    setComplaints((list) => list.map((c) => (c.id === id ? { ...c, attachments } : c)));
+  }
+
+  async function remove() {
+    if (!current) return;
+    setBusy(true);
+    const result = await deleteComplaint(current.id);
+    setBusy(false);
+    setAsking(false);
+    if (!result.ok) return notify.error("Complaint not deleted", result.message);
+    notify.success("Complaint deleted", "It is no longer in your list.");
+    setPicked(null);
+    setComplaints((list) => list.filter((c) => c.id !== current.id));
+  }
 
   if (!current) return <Empty />;
   const next = whatNext(current);
@@ -45,6 +71,7 @@ export function MyComplaints({ complaints, selectedId }: { complaints: PortalCom
                   <StepBar complaint={c} />
                   <span className={muted}>
                     {referenceText(c)} · {formatDate(c.submittedAt)}
+                    {c.attachments.length > 0 && ` · ${c.attachments.length} ${c.attachments.length === 1 ? "file" : "files"}`}
                   </span>
                 </button>
               </li>
@@ -85,11 +112,34 @@ export function MyComplaints({ complaints, selectedId }: { complaints: PortalCom
               <p className="mt-1.5 whitespace-pre-wrap text-[0.88rem] leading-[1.55] text-slate-ink">{current.description}</p>
             </div>
           )}
-          <p className={`border-t border-[#efe9eb] pt-3 ${muted}`}>
-            Updates about this case reach you by SMS or email. Staff notes and internal steps are not shown here.
-          </p>
+          <AttachmentGallery
+            key={current.id}
+            complaintId={current.id}
+            attachments={current.attachments}
+            editable={current.canDelete}
+            onChange={(next) => setFiles(current.id, next)}
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#efe9eb] pt-3">
+            <p className={`m-0 max-w-[26rem] ${muted}`}>
+              Updates about this case reach you by SMS or email. Staff notes and internal steps are not shown here.
+            </p>
+            {current.canDelete && <PillButton onClick={() => setAsking(true)}>Delete complaint</PillButton>}
+          </div>
         </Card>
       </div>
+
+      {asking && (
+        <ConfirmDialog
+          title="Delete this complaint?"
+          confirmLabel="Delete"
+          busy={busy}
+          onConfirm={() => void remove()}
+          onCancel={() => setAsking(false)}
+        >
+          SPRPTA has not started on “{current.subject}” yet, so you can still delete it. It will disappear from your
+          list and SPRPTA staff will not see it. SPRPTA keeps a record that it was submitted and deleted.
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

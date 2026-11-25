@@ -6,9 +6,12 @@ complainant only ever sees four simple steps, never the ten internal statuses,
 and never staff notes or the severity.
 """
 
+import re
 from datetime import datetime
+from pathlib import Path
+from typing import BinaryIO
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.enums import ComplaintStatus
@@ -17,26 +20,32 @@ from app.models import (
     Area,
     ComplainantAccount,
     Complaint,
+    ComplaintAttachment,
     ComplaintCategory,
     ComplaintMedium,
     ComplaintTargetType,
     RouteStand,
+    Vehicle,
 )
 from app.schemas.portal import (
     Named,
+    PortalAttachment,
     PortalCategory,
     PortalComplaint,
     PortalComplaintForm,
     PortalOptions,
     PortalPlace,
     PortalTarget,
+    PortalVehicle,
 )
 from app.services import audit_service
+from app.services import complaint_attachment_service as attachments
 from app.services import complaint_lookup_service as lookup
 from app.services.auth_service import Principal
 from app.services.complaint_intake_service import ComplaintError
 
 LIST_LIMIT = 200
+SUGGESTION_LIMIT = 8
 
 # Internal status to the four steps the complainant sees. Closed and rejected both end the case.
 _STEP = {
@@ -100,7 +109,44 @@ def _out(db: Session, c: Complaint) -> PortalComplaint:
         route_stand_name=_name(db, RouteStand, c.route_stand_id),
         vehicle_number=c.vehicle_number_entered,
         description=c.description,
+        attachments=[
+            PortalAttachment.model_validate(a, from_attributes=True)
+            for a in db.scalars(
+                select(ComplaintAttachment)
+                .where(ComplaintAttachment.complaint_id == c.id, ComplaintAttachment.removed_at.is_(None))
+                .order_by(ComplaintAttachment.id)
+            )
+        ],
+        can_delete=_is_open(c),
     )
+
+
+def _is_open(c: Complaint) -> bool:
+    """Level 1 has not checked it yet, so the complainant may still change it, add or remove files, or delete it."""
+    return c.status == ComplaintStatus.SUBMITTED and c.withdrawn_at is None
+
+
+def _own(db: Session, principal: Principal, complaint_id: int, *, lock: bool = False) -> Complaint:
+    """The caller's own complaint. Someone else's, a deleted one and a missing one all look the same: not found."""
+    query = select(Complaint).where(
+        Complaint.id == complaint_id,
+        Complaint.complainant_account_id == principal.id,
+        Complaint.status != ComplaintStatus.DRAFT,
+        Complaint.withdrawn_at.is_(None),
+    )
+    c = db.scalar(query.with_for_update() if lock else query)
+    if c is None:
+        raise ComplaintError(404, "not_found", "That complaint does not exist.")
+    return c
+
+
+def _own_open(db: Session, principal: Principal, complaint_id: int) -> Complaint:
+    c = _own(db, principal, complaint_id, lock=True)
+    if not _is_open(c):
+        raise ComplaintError(
+            409, "already_checked", "SPRPTA has already started on this complaint, so it can no longer be changed."
+        )
+    return c
 
 
 def list_own(db: Session, principal: Principal) -> list[PortalComplaint]:
@@ -109,6 +155,7 @@ def list_own(db: Session, principal: Principal) -> list[PortalComplaint]:
         .where(
             Complaint.complainant_account_id == principal.id,
             Complaint.status != ComplaintStatus.DRAFT,
+            Complaint.withdrawn_at.is_(None),
         )
         .order_by(Complaint.id.desc())
         .limit(LIST_LIMIT)
@@ -117,16 +164,95 @@ def list_own(db: Session, principal: Principal) -> list[PortalComplaint]:
 
 
 def get_own(db: Session, principal: Principal, complaint_id: int) -> PortalComplaint:
-    c = db.scalar(
-        select(Complaint).where(
-            Complaint.id == complaint_id,
-            Complaint.complainant_account_id == principal.id,
-            Complaint.status != ComplaintStatus.DRAFT,
+    return _out(db, _own(db, principal, complaint_id))
+
+
+# ---------------------------------------------------------------- deleting
+
+
+def withdraw(db: Session, principal: Principal, complaint_id: int) -> None:
+    """Delete a complaint that Level 1 has not checked yet.
+
+    The row stays in the complaints table, marked withdrawn, with its files and its audit trail: nothing about a
+    complaint is ever removed. Staff lists leave it out. Once SPRPTA has started on it, it can no longer be deleted.
+    """
+    c = _own_open(db, principal, complaint_id)
+    c.withdrawn_at = datetime.now(LOCAL)
+    audit_service.record(
+        db, principal, action="complaint.withdraw_portal", entity_type="complaints", entity_id=c.id,
+        complaint_id=c.id, from_status=c.status, to_status=c.status, reason="Deleted by the complainant",
+    )
+    db.commit()
+
+
+# ---------------------------------------------------------------- evidence files
+
+
+def add_file(db: Session, principal: Principal, complaint_id: int, *, file: BinaryIO, file_name: str, mime_type: str) -> PortalAttachment:
+    c = _own_open(db, principal, complaint_id)
+    saved = attachments.store_attachment(
+        db, principal, c, file=file, file_name=file_name, mime_type=mime_type, description=None
+    )
+    return PortalAttachment.model_validate(saved, from_attributes=True)
+
+
+def _find_file(db: Session, complaint: Complaint, attachment_id: int) -> ComplaintAttachment:
+    a = db.scalar(
+        select(ComplaintAttachment).where(
+            ComplaintAttachment.id == attachment_id,
+            ComplaintAttachment.complaint_id == complaint.id,
+            ComplaintAttachment.removed_at.is_(None),
         )
     )
-    if c is None:  # someone else's complaint looks the same as one that does not exist
-        raise ComplaintError(404, "not_found", "That complaint does not exist.")
-    return _out(db, c)
+    if a is None:
+        raise ComplaintError(404, "not_found", "That file does not exist.")
+    return a
+
+
+def remove_file(db: Session, principal: Principal, complaint_id: int, attachment_id: int) -> None:
+    c = _own_open(db, principal, complaint_id)
+    a = _find_file(db, c, attachment_id)
+    a.removed_at = datetime.now(LOCAL)
+    audit_service.record(
+        db, principal, action="attachment.remove", entity_type="complaint_attachments", entity_id=a.id,
+        complaint_id=c.id, details={"file_name": a.file_name},
+    )
+    db.commit()
+
+
+def open_file(db: Session, principal: Principal, complaint_id: int, attachment_id: int) -> tuple[Path, str, str]:
+    """Where a file of the caller's own complaint is stored, its name and its type."""
+    a = _find_file(db, _own(db, principal, complaint_id), attachment_id)
+    root = attachments.storage_root().resolve()
+    path = (root / a.storage_path).resolve()
+    if root not in path.parents:  # the stored path never points outside the upload folder; refuse if it ever did
+        raise ComplaintError(404, "not_found", "That file does not exist.")
+    return path, a.file_name, a.mime_type
+
+
+# ---------------------------------------------------------------- finding a vehicle while typing
+
+
+def suggest_vehicles(db: Session, text: str) -> list[PortalVehicle]:
+    """Vehicles whose number starts with what was typed. Spaces, dashes and capitals do not matter."""
+    typed = re.sub(r"[\s-]", "", text).upper()
+    if not typed:
+        return []
+    plain = func.upper(func.replace(func.replace(Vehicle.vehicle_number, " ", ""), "-", ""))
+    prefix = typed.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+    rows = db.execute(
+        select(Vehicle, Area.name)
+        .join(Area, Area.id == Vehicle.registered_area_id)
+        .where(Vehicle.is_active, plain.like(prefix, escape="\\"))
+        .order_by(Vehicle.vehicle_number)
+        .limit(SUGGESTION_LIMIT)
+    )
+    return [
+        PortalVehicle(
+            vehicle_number=v.vehicle_number, vehicle_type=v.vehicle_type.value, area_id=v.registered_area_id, area_name=area
+        )
+        for v, area in rows
+    ]
 
 
 # ---------------------------------------------------------------- lodging

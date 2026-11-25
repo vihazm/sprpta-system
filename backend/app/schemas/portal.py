@@ -74,6 +74,22 @@ class PortalOptions(BaseModel):
     routes_stands: list[PortalPlace]
 
 
+class PortalVehicle(BaseModel):
+    """A vehicle offered while the complainant types a number."""
+
+    vehicle_number: str
+    vehicle_type: str
+    area_id: int
+    area_name: str
+
+
+class PortalAttachment(BaseModel):
+    id: int
+    file_name: str
+    mime_type: str
+    size_bytes: int
+
+
 class PortalComplaint(BaseModel):
     id: int
     reference_number: str | None  # none until Level 1 has registered it
@@ -91,3 +107,5 @@ class PortalComplaint(BaseModel):
     route_stand_name: str | None
     vehicle_number: str | None
     description: str | None
+    attachments: list[PortalAttachment]
+    can_delete: bool  # only while Level 1 has not checked it yet

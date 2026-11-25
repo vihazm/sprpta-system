@@ -2,7 +2,9 @@ import Link from "next/link";
 import { Card, CardHeading, Chip, LinkButton, bigNumber, eyebrow, muted } from "@/components/dashboard/ui";
 import { formatToday } from "@/components/dashboard/dates";
 import { getSession } from "@/lib/session";
-import { loadComplaints } from "./api";
+import { Icon } from "@/components/dashboard/icons";
+import { fileUrl, loadComplaints } from "./api";
+import { isImage } from "./files";
 import { StepBar } from "./StepBar";
 import { formatDate, referenceText, statusTone, whatNext } from "./status";
 import type { PortalComplaint } from "./types";
@@ -84,6 +86,7 @@ export async function CpDashboard() {
                       <span className="block text-[0.9rem] font-bold">{c.subject}</span>
                       <span className={`block ${muted}`}>
                         {referenceText(c)} · {formatDate(c.submittedAt)}
+                        {c.attachments.length > 0 && ` · ${c.attachments.length} ${c.attachments.length === 1 ? "file" : "files"}`}
                       </span>
                     </span>
                     <Chip tone={statusTone(c)}>{c.statusLabel}</Chip>
@@ -139,7 +142,11 @@ function LatestUpdate({ complaint }: { complaint: PortalComplaint }) {
           Latest update · {referenceText(complaint)}
         </p>
         <p className="mt-1 text-[0.95rem] font-extrabold">{complaint.subject}</p>
-        <p className={`mt-0.5 ${muted}`}>{next.title}</p>
+        <p className={`mt-0.5 ${muted}`}>
+          {next.title}
+          {complaint.attachments.length > 0 &&
+            ` · ${complaint.attachments.length} ${complaint.attachments.length === 1 ? "file" : "files"} added`}
+        </p>
       </div>
       <StepBar complaint={complaint} className="min-w-40 flex-[1_1_12rem]" />
       <Chip tone={statusTone(complaint)}>{complaint.statusLabel}</Chip>
@@ -149,6 +156,34 @@ function LatestUpdate({ complaint }: { complaint: PortalComplaint }) {
       >
         View
       </Link>
+      {complaint.attachments.length > 0 && (
+        <ul className="m-0 flex w-full list-none flex-wrap gap-2 border-t border-[#efe9eb] p-0 pt-3.5" aria-label="Files you added">
+          {complaint.attachments.slice(0, 6).map((a) => (
+            <li key={a.id}>
+              <a
+                href={fileUrl(complaint.id, a.id)}
+                target="_blank"
+                rel="noopener"
+                aria-label={`Open ${a.fileName}`}
+                title={a.fileName}
+                className="focus-ring grid size-[3.2rem] place-items-center overflow-hidden rounded-[0.8rem] bg-[#f7f4f5] text-crimson"
+              >
+                {isImage(a.mimeType) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- the person's own upload, served by the API
+                  <img src={fileUrl(complaint.id, a.id)} alt="" loading="lazy" className="size-full object-cover" />
+                ) : (
+                  <Icon name="file" size={20} />
+                )}
+              </a>
+            </li>
+          ))}
+          {complaint.attachments.length > 6 && (
+            <li className="grid size-[3.2rem] place-items-center rounded-[0.8rem] bg-[#f7f4f5] text-[0.76rem] font-bold text-muted">
+              +{complaint.attachments.length - 6}
+            </li>
+          )}
+        </ul>
+      )}
     </Card>
   );
 }

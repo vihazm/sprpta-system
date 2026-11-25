@@ -1,38 +1,92 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { inputClass, textareaClass, CharCount } from "@/components/dashboard/controls";
 import { Card, eyebrow, muted } from "@/components/dashboard/ui";
 import { FieldError } from "@/components/login/FieldError";
 import { notify } from "@/lib/notify";
-import { submitComplaint } from "./api";
-import type { PortalComplaint, PortalOptions } from "./types";
+import { searchVehicles, submitComplaint, uploadFile } from "./api";
+import { Combobox, type Choice } from "./Combobox";
+import { EvidencePicker, releasePreviews, type PickedFile } from "./EvidencePicker";
+import { withKnownType } from "./files";
+import type { PortalComplaint, PortalOptions, PortalVehicle } from "./types";
 
 const SUBJECT_MAX = 200;
 const DESCRIPTION_MAX = 5000;
+const SUGGESTIONS = 8;
 
 // The browser's own calendar day, as the date box wants it (yyyy-mm-dd).
 const today = () => new Date().toLocaleDateString("en-CA");
+
+/** Routes whose name starts with what was typed first, then those with a word that starts with it. */
+function matchRoutes(routes: PortalOptions["routesStands"], typed: string) {
+  const t = typed.trim().toLowerCase();
+  if (!t) return [];
+  const starts = routes.filter((r) => r.name.toLowerCase().startsWith(t));
+  const words = routes.filter(
+    (r) => !r.name.toLowerCase().startsWith(t) && r.name.toLowerCase().split(/[\s\-–/]+/).some((w) => w.startsWith(t)),
+  );
+  return [...starts, ...words].slice(0, SUGGESTIONS);
+}
+
+type Result = { complaint: PortalComplaint; uploaded: number; failed: string[] };
 
 /** New complaint (UI-CP-04): the standard form. Severity and vehicle checking are left to Level 1. */
 export function NewComplaintForm({ options }: { options: PortalOptions }) {
   const [date, setDate] = useState(today);
   const [targetId, setTargetId] = useState("");
   const [vehicle, setVehicle] = useState("");
+  const [found, setFound] = useState<PortalVehicle[]>([]);
   const [areaId, setAreaId] = useState("");
-  const [routeId, setRouteId] = useState("");
+  const [routeText, setRouteText] = useState("");
+  const [routeId, setRouteId] = useState<number | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [files, setFiles] = useState<PickedFile[]>([]);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState<PortalComplaint | null>(null);
+  const [progress, setProgress] = useState("");
+  const [result, setResult] = useState<Result | null>(null);
+
+  // The temporary previews of chosen photos are freed when the form goes away.
+  const live = useRef(files);
+  useEffect(() => {
+    live.current = files;
+  }, [files]);
+  useEffect(() => () => releasePreviews(live.current), []);
+
+  // While a vehicle number is typed, ask the server which numbers start that way (after a short pause).
+  const query = vehicle.trim();
+  useEffect(() => {
+    if (!query) return;
+    let stale = false;
+    const timer = setTimeout(async () => {
+      const reply = await searchVehicles(query);
+      if (!stale && reply.ok) setFound(reply.data);
+    }, 180);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   const categories = options.categories.filter(
     (c) => c.targetIds.length === 0 || (targetId !== "" && c.targetIds.includes(Number(targetId))),
   );
-  const places = options.routesStands.filter((p) => p.areaId === null || (areaId !== "" && p.areaId === Number(areaId)));
+  const routesHere = options.routesStands.filter((p) => areaId === "" || p.areaId === null || p.areaId === Number(areaId));
+
+  const vehicleChoices: Choice[] = (query ? found : []).slice(0, SUGGESTIONS).map((v) => ({
+    key: v.vehicleNumber,
+    label: v.vehicleNumber,
+    hint: `${v.vehicleType === "bus" ? "Bus" : "Trishaw"} · ${v.areaName}`,
+  }));
+  const routeChoices: Choice[] = matchRoutes(routesHere, routeText).map((r) => ({
+    key: String(r.id),
+    label: r.name,
+    hint: options.areas.find((a) => a.id === r.areaId)?.name,
+  }));
 
   const errors = {
     date: !date ? "Choose the date." : date > today() ? "The date cannot be in the future." : "",
@@ -52,8 +106,25 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
 
   function changeArea(next: string) {
     setAreaId(next);
-    const place = options.routesStands.find((p) => String(p.id) === routeId);
-    if (place && place.areaId !== null && String(place.areaId) !== next) setRouteId("");
+    const place = options.routesStands.find((p) => p.id === routeId);
+    if (place && place.areaId !== null && String(place.areaId) !== next) {
+      setRouteId(null);
+      setRouteText("");
+    }
+  }
+
+  function pickVehicle(choice: Choice) {
+    setVehicle(choice.label);
+    const match = found.find((v) => v.vehicleNumber === choice.label);
+    if (match && !areaId) changeArea(String(match.areaId)); // the vehicle's own area, unless one was already chosen
+  }
+
+  function pickRoute(choice: Choice) {
+    const place = options.routesStands.find((p) => String(p.id) === choice.key);
+    if (!place) return;
+    setRouteText(place.name);
+    setRouteId(place.id);
+    if (!areaId && place.areaId !== null) setAreaId(String(place.areaId));
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -63,23 +134,38 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
     if (Object.values(errors).some(Boolean)) return;
 
     setBusy(true);
-    const result = await submitComplaint({
+    const created = await submitComplaint({
       complaintDate: date,
       targetTypeId: Number(targetId),
       subject,
       vehicleNumber: vehicle,
       areaId: Number(areaId),
-      routeStandId: routeId ? Number(routeId) : null,
+      routeStandId: routeId,
       categoryId: Number(categoryId),
       description,
     });
+    if (!created.ok) {
+      setBusy(false);
+      return notify.error("Complaint not submitted", created.message);
+    }
+
+    // The complaint exists now. A file that fails does not undo it; the person is told which ones to add again.
+    let uploaded = 0;
+    const failed: string[] = [];
+    for (const [i, picked] of files.entries()) {
+      setProgress(`Uploading file ${i + 1} of ${files.length}…`);
+      const sent = await uploadFile(created.data.id, withKnownType(picked.file));
+      if (sent.ok) uploaded += 1;
+      else failed.push(`${picked.file.name}: ${sent.message}`);
+    }
+    releasePreviews(files);
     setBusy(false);
-    if (!result.ok) return notify.error("Complaint not submitted", result.message);
+    setProgress("");
     notify.success("Complaint submitted", "SPRPTA will check it first.");
-    setSent(result.data);
+    setResult({ complaint: created.data, uploaded, failed });
   }
 
-  if (sent) return <Submitted complaint={sent} />;
+  if (result) return <Submitted result={result} />;
 
   return (
     <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
@@ -122,13 +208,14 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
           </select>
         </Field>
         <Field label="Vehicle number (if you know it)" id="cp-vehicle" optional>
-          <input
+          <Combobox
             id="cp-vehicle"
-            className={inputClass}
-            placeholder="e.g. SP NB-4821"
-            maxLength={20}
             value={vehicle}
-            onChange={(e) => setVehicle(e.target.value)}
+            onType={(text) => setVehicle(text.toUpperCase())}
+            choices={vehicleChoices}
+            onPick={pickVehicle}
+            placeholder="Start typing, e.g. SP NB"
+            maxLength={20}
           />
         </Field>
       </Section>
@@ -152,14 +239,21 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
           </select>
         </Field>
         <Field label="Route or stand (optional)" id="cp-route" optional>
-          <select id="cp-route" className={inputClass} value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-            <option value="">{areaId ? "Not sure / none" : "Choose the area first"}</option>
-            {places.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <Combobox
+            id="cp-route"
+            value={routeText}
+            onType={(text) => {
+              setRouteText(text);
+              if (routeId !== null) setRouteId(null); // typing again means it is no longer the one that was picked
+            }}
+            choices={routeChoices}
+            onPick={pickRoute}
+            placeholder="Start typing a route or stand"
+            emptyNote="No route or stand starts like that. You can leave this empty."
+            onBlurText={() => {
+              if (routeId === null) setRouteText(""); // only a route picked from the list is kept
+            }}
+          />
         </Field>
       </Section>
 
@@ -210,6 +304,10 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
         </Field>
       </Section>
 
+      <Section n={4} title="Evidence (optional)" stacked>
+        <EvidencePicker picked={files} onChange={setFiles} disabled={busy} />
+      </Section>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className={`max-w-[26rem] ${muted}`}>
           Your name and contact come from your account. Severity and vehicle details are confirmed by SPRPTA staff.
@@ -226,7 +324,7 @@ export function NewComplaintForm({ options }: { options: PortalOptions }) {
             disabled={busy}
             className="focus-ring h-12 cursor-pointer rounded-[0.95rem] bg-crimson px-6 text-[0.9rem] font-extrabold text-white transition-colors hover:bg-crimson-hover disabled:cursor-wait disabled:opacity-70"
           >
-            {busy ? "Submitting…" : "Submit complaint"}
+            {busy ? progress || "Submitting…" : "Submit complaint"}
           </button>
         </div>
       </div>
@@ -278,7 +376,8 @@ function Field({
 }
 
 /** What the person sees right after submitting. There is no reference number yet: Level 1 issues it. */
-function Submitted({ complaint }: { complaint: PortalComplaint }) {
+function Submitted({ result }: { result: Result }) {
+  const { complaint, uploaded, failed } = result;
   return (
     <Card className="max-w-[40rem] items-start gap-4 !p-9">
       <span className="grid size-16 place-items-center rounded-full bg-emerald-50 text-[1.8rem] font-extrabold text-emerald-800" aria-hidden="true">
@@ -289,6 +388,24 @@ function Submitted({ complaint }: { complaint: PortalComplaint }) {
         Thank you. SPRPTA staff will check it first. You will be told by SMS or email once it is registered and given a
         reference number.
       </p>
+      {uploaded > 0 && (
+        <p className="text-[0.85rem] font-bold text-emerald-800">
+          {uploaded} {uploaded === 1 ? "file" : "files"} attached.
+        </p>
+      )}
+      {failed.length > 0 && (
+        <div role="alert" className="rounded-[1rem] bg-[#fff6f5] px-4 py-3">
+          <p className="m-0 text-[0.85rem] font-extrabold text-error">
+            {failed.length} {failed.length === 1 ? "file was" : "files were"} not attached
+          </p>
+          <ul className="m-0 mt-1 list-none p-0 text-[0.8rem] text-error">
+            {failed.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+          <p className={`m-0 mt-2 ${muted}`}>The complaint itself is saved. You can add the files again from My complaints.</p>
+        </div>
+      )}
       <div className="mt-1 flex flex-wrap gap-2.5">
         <Link
           href={`/cp/complaints?id=${complaint.id}`}
