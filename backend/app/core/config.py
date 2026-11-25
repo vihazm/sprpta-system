@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     ip_failure_limit: int = 20
     ip_failure_window_minutes: int = 10
 
+    # --- complainant sign-up codes (one-time passwords) ---
+    otp_minutes: int = 10  # how long a code works
+    otp_max_attempts: int = 5  # wrong guesses before a new code is needed
+    otp_resend_seconds: int = 60  # wait before another code can be asked for
+
     # --- cookies and CSRF ---
     cookie_secure: bool | None = None  # None = secure outside development
     allowed_origins: list[str] = Field(

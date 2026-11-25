@@ -20,7 +20,7 @@ export const LANDING_PATH: Record<Role, string> = {
   l3: "/l3/dashboard",
   admin: "/admin/dashboard",
   implementing_staff: "/is/cases",
-  cp: "/cp/complaints",
+  cp: "/cp/dashboard",
 };
 
 // First URL segment of each role's area, used for route guards.
@@ -60,7 +60,11 @@ export type NavItem = { label: string; href?: string };
 
 // An item gets an href once its screen exists; until then it shows as "Soon".
 export const NAV_ITEMS: Record<Role, NavItem[]> = {
-  cp: [{ label: "My complaints", href: "/cp/complaints" }, { label: "New complaint" }],
+  cp: [
+    { label: "Dashboard", href: "/cp/dashboard" },
+    { label: "New complaint", href: "/cp/new-complaint" },
+    { label: "My complaints", href: "/cp/complaints" },
+  ],
   implementing_staff: [{ label: "Case search", href: "/is/cases" }],
   l1: [
     { label: "Dashboard", href: "/l1/dashboard" },

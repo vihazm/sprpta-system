@@ -48,3 +48,5 @@ class FailureLimiter:
 
 
 login_failures = FailureLimiter()
+# Sign-up and "send a new code" requests per client IP, so the sign-up cannot be used to flood someone with codes.
+signup_requests = FailureLimiter()

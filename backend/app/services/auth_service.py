@@ -211,10 +211,15 @@ def login(
 
     account.failed_login_count = 0
     account.locked_until = None
-    account.last_login_at = now
     if password_needs_rehash(account.password_hash):
         account.password_hash = hash_password(password)
+    return start_session(db, account, ip, user_agent)
 
+
+def start_session(db: Session, account: Account, ip: str | None, user_agent: str | None) -> IssuedTokens:
+    """Open a new session for an account that has just proved who it is (a password, or a sign-up code)."""
+    now = _now()
+    account.last_login_at = now
     raw, hashed = new_refresh_token()
     absolute = now + timedelta(hours=settings.session_absolute_hours)
     sess = AuthSession(
