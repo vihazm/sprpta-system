@@ -85,6 +85,7 @@ type ApiComplaint = {
   reference_number: string | null;
   status: string;
   via_portal: boolean;
+  registration_message_sent: boolean;
   medium_id: number | null;
   is_anonymous: boolean;
   complainant_name: string | null;
@@ -145,6 +146,7 @@ function toComplaint(c: ApiComplaint): SavedComplaint {
     reference: c.reference_number,
     status: (KNOWN_STATUS.includes(c.status) ? c.status : "other") as ComplaintStatus,
     viaPortal: c.via_portal,
+    messageSent: c.registration_message_sent,
     values: {
       anonymous: c.is_anonymous,
       name: c.complainant_name ?? "",

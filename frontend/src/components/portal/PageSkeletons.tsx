@@ -124,6 +124,17 @@ export function RecordsSkeleton() {
   );
 }
 
+export function MessageTemplatesSkeleton() {
+  return (
+    <div className={stack}>
+      <HeadingBar />
+      {Array.from({ length: 2 }, (_, i) => (
+        <SkeletonCard key={i} height="min-h-[26rem]" />
+      ))}
+    </div>
+  );
+}
+
 const statistics: Cell[] = [
   [12, "min-h-[9rem]"],
   [12, "min-h-[7rem]"],

@@ -93,7 +93,7 @@ export const NAV_ITEMS: Record<Role, NavItem[]> = {
     { label: "Dashboard", href: "/admin/dashboard" },
     { label: "Users", href: "/admin/users" },
     { label: "Master data", href: "/admin/master-data" },
-    { label: "Message templates" },
+    { label: "Message templates", href: "/admin/message-templates" },
     { label: "Policy documents" },
     { label: "Settings" },
     { label: "System health", href: "/admin/system-health" },

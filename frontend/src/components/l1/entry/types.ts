@@ -92,6 +92,7 @@ export type SavedComplaint = {
   reference: string | null; // a draft has none yet
   status: ComplaintStatus;
   viaPortal: boolean; // sent by a complainant through the portal
+  messageSent: boolean; // the registration message went out to the complainant
   values: ComplaintFields;
   vehicle: VehicleRecord | null;
   duty: BusRecord | null; // the verified record as it was when the complaint was saved

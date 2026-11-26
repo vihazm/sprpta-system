@@ -1,5 +1,6 @@
-// Browser-side calls for the complainant sign-up: send a code, ask for a new one, check the code.
-// The session cookies are set by the backend when the code is accepted.
+// Browser-side calls for the complainant sign-up (send a code, ask for a new one, check the code) and for a
+// forgotten password (ask for a code, then set a new password with it). The session cookies are set by the backend
+// when a sign-up code is accepted.
 
 import { isRole, type Role } from "@/lib/roles";
 
@@ -85,4 +86,14 @@ export async function verifyCode(
     return { ok: true, role: body.user.role, name: String(body.user.name ?? ""), redirectTo: body.redirect_to };
   }
   return failure(result.res, result.data);
+}
+
+export function requestReset(identifier: string) {
+  return sendCode("/api/auth/forgot-password", { identifier });
+}
+
+export async function resetPassword(identifier: string, code: string, password: string): Promise<{ ok: true } | Failure> {
+  const result = await post("/api/auth/reset-password", { identifier, code, password });
+  if ("ok" in result) return result;
+  return result.res.ok ? { ok: true } : failure(result.res, result.data);
 }

@@ -1,4 +1,4 @@
-"""Complainant sign-up: /api/auth/signup, /verify-otp and /resend-otp (public, before any session exists)."""
+"""Complainant sign-up and password reset under /api/auth (public, before any session exists)."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
@@ -7,7 +7,7 @@ from app.api.deps import client_ip, error
 from app.api.routes.auth import SessionOut, _no_store, _session_out, _set_cookies
 from app.core.rate_limit import signup_requests
 from app.db.session import get_db
-from app.schemas.portal import CodeSent, ResendRequest, SignUpRequest, VerifyRequest
+from app.schemas.portal import CodeSent, ResendRequest, ResetRequest, SignUpRequest, VerifyRequest
 from app.services import portal_signup_service as signup
 from app.services.portal_signup_service import SignupError
 
@@ -64,3 +64,24 @@ def verify(body: VerifyRequest, request: Request, response: Response, db: Sessio
         raise _fail(exc) from None
     _set_cookies(response, issued)
     return _session_out(issued.principal, db)
+
+
+@router.post("/forgot-password", response_model=CodeSent)
+def forgot_password(body: ResendRequest, request: Request, response: Response, db: Session = Depends(get_db)) -> CodeSent:
+    _no_store(response)
+    _limit(request)
+    try:
+        channel, wait = signup.request_reset(db, body.identifier)
+    except SignupError as exc:
+        raise _fail(exc) from None
+    return CodeSent(channel=channel, resend_after=wait)
+
+
+@router.post("/reset-password", status_code=204)
+def reset_password(body: ResetRequest, request: Request, db: Session = Depends(get_db)) -> Response:
+    _limit(request)
+    try:
+        signup.reset_password(db, body.identifier, body.code, body.password)
+    except SignupError as exc:
+        raise _fail(exc) from None
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})

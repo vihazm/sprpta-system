@@ -43,7 +43,8 @@ class ForwardedRow(BaseModel):
     severity: SeverityName | None
     area_name: str | None
     forwarded_at: datetime
-    has_contact: bool  # a mobile number or an email is on record, so a registration message would be due
+    has_contact: bool  # a mobile number or an email is on record, so a registration message is due
+    message_sent: bool  # the registration message went out
 
 
 class OverviewOut(BaseModel):

@@ -6,8 +6,8 @@ checked yet), and every move is written to the audit trail. A portal complaint
 goes through the same form; only who sent it and how stay as the complainant's
 account gave them. The reference number is issued when the complaint is first
 saved as Incomplete or forwarded; that moment also starts the time-target clock,
-and Incomplete pauses it. The registration message to the complainant belongs to
-the messaging module, which is not built yet.
+and Incomplete pauses it. The registration message (MSG-1) goes to the complainant
+then, if a phone or email is on record.
 """
 
 from datetime import datetime
@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.enums import ComplaintStatus, DuplicateLinkType, PersonType, RejectionType
+from app.core.enums import ComplaintStatus, DuplicateLinkType, MessageType, PersonType, RejectionType
 from app.core.identifiers import normalise_identifier
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL
@@ -44,7 +44,7 @@ from app.schemas.l1_complaints import (
     DutySnapshotOut,
     RejectBody,
 )
-from app.services import audit_service
+from app.services import audit_service, messaging_service
 from app.services import complaint_lookup_service as lookup
 from app.services.complaint_list_service import OPEN_AT_LEVEL_ONE, accused_status
 from app.services.auth_service import Principal
@@ -103,6 +103,7 @@ def _out(db: Session, complaint: Complaint) -> ComplaintOut:
         reference_number=complaint.reference_number,
         status=complaint.status,
         via_portal=complaint.submitted_via_portal,
+        registration_message_sent=complaint.id in messaging_service.sent_to(db, [complaint.id], MessageType.REGISTERED),
         medium_id=complaint.medium_id,
         is_anonymous=complaint.is_anonymous,
         complainant_name=complaint.complainant_name,
@@ -431,6 +432,7 @@ def save_incomplete(db: Session, principal: Principal, complaint_id: int) -> Com
     complaint.paused_since = now
     _move(db, principal, complaint, ComplaintStatus.INCOMPLETE, "complaint.incomplete")
     db.commit()
+    messaging_service.send_case_message(db, complaint, MessageType.REGISTERED)
     return _out(db, complaint)
 
 
@@ -486,6 +488,7 @@ def forward(db: Session, principal: Principal, complaint_id: int) -> ComplaintOu
         details={"assigned_l2_user_id": officer.id},
     )
     db.commit()
+    messaging_service.send_case_message(db, complaint, MessageType.REGISTERED)  # unless it went out at Incomplete
     return _out(db, complaint)
 
 

@@ -1,14 +1,17 @@
-"""Complainant sign-up with a one-time code (UC-CP-01).
+"""Complainant sign-up and password reset, both with a one-time code (UC-CP-01, UC-CP-02).
 
-The person gives a name, an email or phone number and a password. A six digit
-code goes to that email or phone; once it is entered the account is verified
-and signed in. Until then the account cannot log in.
+Sign-up: the person gives a name, an email or phone number and a password. A six
+digit code goes to that email or phone; once it is entered the account is
+verified and signed in. Until then the account cannot log in.
+
+Password reset: a verified account asks for a code, then sends it back with a
+new password. Every session of the account is ended. Staff passwords are not
+reset here; the System Administrator handles staff accounts.
 
 Codes are stored only as a keyed hash, expire after a few minutes, allow a few
-wrong guesses and can be asked for again after a short wait. Delivery is
-"console" for SMS: the code is printed in the backend terminal. Email goes out through SMTP
-when SMTP_* is set in backend/.env; otherwise it is printed too. Printing is only allowed in
-development; anywhere else no code is sent until a provider is connected.
+wrong guesses and can be asked for again after a short wait. The code goes out
+through the messaging service, with the wording of the Verification code template
+(printed in the backend terminal until SMS and email are connected).
 """
 
 import hashlib
@@ -16,15 +19,15 @@ import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.enums import MessageChannel, MessageState, MessageType
+from app.core.enums import MessageChannel
 from app.core.identifiers import normalise_identifier
 from app.core.security import hash_password
-from app.models import ComplainantAccount, OtpCode, OutboundMessage, User
-from app.services import auth_service, email_sender
+from app.models import AuthSession, ComplainantAccount, OtpCode, User
+from app.services import auth_service, messaging_service
 from app.services.auth_service import IssuedTokens
 
 
@@ -55,67 +58,17 @@ def _hash_code(account_id: int, code: str) -> str:
     return hmac.new(key, f"{account_id}:{code}".encode(), hashlib.sha256).hexdigest()
 
 
-def _email_body(code: str) -> tuple[str, str]:
-    """The plain text and the HTML of the sign-up email."""
-    minutes = settings.otp_minutes
-    text = "\n\n".join(
-        [
-            f"Your SPRPTA verification code is {code}.",
-            f"It works for {minutes} minutes. If you did not ask for it, you can ignore this email.",
-            "Southern Provincial Road Passenger Transport Authority",
-        ]
-    )
-    html = (
-        '<div style="font-family:Arial,sans-serif;max-width:28rem;color:#16181d">'
-        '<p style="margin:0 0 .5rem;font-size:.8rem;letter-spacing:.08em;color:#b3112f;font-weight:bold">SPRPTA</p>'
-        '<p style="margin:0 0 1rem">Your verification code is</p>'
-        f'<p style="margin:0 0 1rem;font-size:2rem;letter-spacing:.3rem;font-weight:bold">{code}</p>'
-        f'<p style="margin:0 0 1rem;color:#5b6574">It works for {minutes} minutes. '
-        "If you did not ask for it, you can ignore this email.</p>"
-        '<p style="margin:0;color:#5b6574;font-size:.85rem">Southern Provincial Road Passenger Transport Authority</p>'
-        "</div>"
-    )
-    return text, html
-
-
-def _send(channel: MessageChannel, recipient: str, code: str) -> str | None:
-    """Send the code. Returns None when it went out, or a short reason when it did not."""
-    if channel is MessageChannel.EMAIL and settings.email_configured:
-        text, html = _email_body(code)
-        try:
-            email_sender.send_email(recipient, "Your SPRPTA verification code", text, html)
-        except email_sender.EmailError as exc:
-            return str(exc)
-        return None
-    if settings.is_development:
-        # Console mode: the code appears in the backend terminal (used for SMS, and for email until SMTP is set up).
-        if channel is MessageChannel.EMAIL:
-            print("[SPRPTA] No email was sent: SMTP_HOST and SMTP_USER are not set in backend/.env.", flush=True)
-        print(f"[SPRPTA sign-up code] {recipient}: {code}", flush=True)
-        return None
-    return "No SMS or email provider is connected."
-
-
-def _deliver(db: Session, account: ComplainantAccount, channel: MessageChannel, recipient: str, code: str) -> None:
-    """Send the code and log the attempt. The log never holds the code itself."""
-    error = _send(channel, recipient, code)
-    db.add(
-        OutboundMessage(
-            complainant_account_id=account.id,
-            message_type=MessageType.OTP,
-            channel=channel,
-            recipient=recipient,
-            body="Your SPRPTA verification code is ******.",
-            state=MessageState.FAILED if error else MessageState.SENT,
-            error_detail=error,
-        )
-    )
+def _deliver(
+    db: Session, account: ComplainantAccount, channel: MessageChannel, recipient: str, code: str, purpose: str
+) -> None:
+    """Send the code through the messaging service, which logs it without the code itself."""
+    error = messaging_service.send_code(db, account.id, channel, recipient, code, f"{purpose} code")
     if error:
         db.commit()
         raise SignupError(503, "code_not_sent", "We could not send a code right now. Please try again later.")
 
 
-def _issue_code(db: Session, account: ComplainantAccount) -> int:
+def _issue_code(db: Session, account: ComplainantAccount, purpose: str = "sign-up") -> int:
     """Replace any unused code with a new one and send it. Returns the seconds before another may be asked for."""
     now = _now()
     channel = MessageChannel.EMAIL if account.email else MessageChannel.SMS
@@ -133,7 +86,7 @@ def _issue_code(db: Session, account: ComplainantAccount) -> int:
             expires_at=now + timedelta(minutes=settings.otp_minutes),
         )
     )
-    _deliver(db, account, channel, recipient, code)
+    _deliver(db, account, channel, recipient, code, purpose)
     db.commit()
     return settings.otp_resend_seconds
 
@@ -145,6 +98,28 @@ def _latest_code(db: Session, account_id: int) -> OtpCode | None:
         .order_by(OtpCode.id.desc())
         .limit(1)
     )
+
+
+def _wait_before_resend(db: Session, account: ComplainantAccount) -> int:
+    """Seconds before another code may be sent to this account (0 when it may be sent now)."""
+    last = _latest_code(db, account.id)
+    if last is None:
+        return 0
+    return max(0, settings.otp_resend_seconds - int((_now() - last.created_at).total_seconds()))
+
+
+def _use_code(db: Session, account: ComplainantAccount, code: str) -> None:
+    """Accept the account's latest code once, or count a wrong guess and refuse."""
+    otp = _latest_code(db, account.id)
+    if otp is None or otp.consumed_at is not None or otp.expires_at <= _now():
+        raise _invalid_code()
+    if otp.attempts >= settings.otp_max_attempts:
+        raise SignupError(429, "too_many_codes", "Too many wrong codes. Ask for a new code.")
+    if not hmac.compare_digest(otp.code_hash, _hash_code(account.id, code)):
+        otp.attempts += 1
+        db.commit()
+        raise _invalid_code()
+    otp.consumed_at = _now()
 
 
 # ---------------------------------------------------------------- the three steps
@@ -194,11 +169,9 @@ def resend_code(db: Session, identifier: str) -> int:
     account = _pending_account(db, kind, value)
     if account is None:
         raise SignupError(404, "no_pending_signup", "There is no sign-up waiting for a code. Please start again.")
-    last = _latest_code(db, account.id)
-    if last is not None:
-        wait = settings.otp_resend_seconds - int((_now() - last.created_at).total_seconds())
-        if wait > 0:
-            raise SignupError(429, "resend_too_soon", f"Please wait {wait} seconds before asking for a new code.", wait)
+    wait = _wait_before_resend(db, account)
+    if wait:
+        raise SignupError(429, "resend_too_soon", f"Please wait {wait} seconds before asking for a new code.", wait)
     return _issue_code(db, account)
 
 
@@ -208,18 +181,51 @@ def verify_code(db: Session, identifier: str, code: str, ip: str | None, user_ag
     account = _pending_account(db, kind, value)
     if account is None:
         raise _invalid_code()
-    otp = _latest_code(db, account.id)
-    now = _now()
-    if otp is None or otp.consumed_at is not None or otp.expires_at <= now:
-        raise _invalid_code()
-    if otp.attempts >= settings.otp_max_attempts:
-        raise SignupError(429, "too_many_codes", "Too many wrong codes. Ask for a new code.")
-
-    if not hmac.compare_digest(otp.code_hash, _hash_code(account.id, code)):
-        otp.attempts += 1
-        db.commit()
-        raise _invalid_code()
-
-    otp.consumed_at = now
-    account.verified_at = now
+    _use_code(db, account, code)
+    account.verified_at = _now()
     return auth_service.start_session(db, account, ip, user_agent)
+
+
+# ---------------------------------------------------------------- forgotten password
+
+
+def _verified_account(db: Session, kind: str, value: str) -> ComplainantAccount | None:
+    """The verified, active account with this email or phone, locked for this request."""
+    column = ComplainantAccount.email if kind == "email" else ComplainantAccount.phone
+    account = db.scalar(select(ComplainantAccount).where(column == value).with_for_update())
+    if account is None or account.verified_at is None or not account.is_active:
+        return None
+    return account
+
+
+def request_reset(db: Session, identifier: str) -> tuple[str, int]:
+    """Send a reset code. Returns (channel, resend wait in seconds).
+
+    The answer is the same whether or not the account exists, so nobody can use this to find out who is registered.
+    Asking again too soon sends nothing and only returns the time left.
+    """
+    kind, value = _parse(identifier)
+    channel = "email" if kind == "email" else "sms"
+    account = _verified_account(db, kind, value)
+    if account is None:
+        return channel, settings.otp_resend_seconds
+    wait = _wait_before_resend(db, account)
+    return channel, wait or _issue_code(db, account, "password reset")
+
+
+def reset_password(db: Session, identifier: str, code: str, password: str) -> None:
+    """Check the code and set the new password. Every session of the account ends and any lock is lifted."""
+    kind, value = _parse(identifier)
+    account = _verified_account(db, kind, value)
+    if account is None:
+        raise _invalid_code()
+    _use_code(db, account, code)
+    account.password_hash = hash_password(password)
+    account.failed_login_count = 0
+    account.locked_until = None
+    db.execute(
+        update(AuthSession)
+        .where(AuthSession.account_id == account.id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=_now(), revoke_reason="password_reset")
+    )
+    db.commit()

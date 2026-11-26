@@ -499,8 +499,10 @@ export function ComplaintForm({
           {forwarded ? (
             <>
               Reference <b>{finished.reference}</b> is now with the {finished.area} area officer, {finished.officer}.
-              {(finished.values.mobile || finished.values.email) &&
-                " The registration message is not sent yet, because messaging is not set up."}
+              {finished.messageSent
+                ? " The complainant was sent a registration message with the reference number."
+                : (finished.values.mobile || finished.values.email) &&
+                  " The registration message could not be sent, but the complaint is forwarded."}
             </>
           ) : (
             <>
@@ -983,7 +985,7 @@ export function ComplaintForm({
       <div className="flex flex-wrap items-center justify-between gap-3.5 border-t border-[#f1ebed] pt-3.5">
         <p className={`${muted} max-w-[26rem]`}>
           Saving a draft or as incomplete never forwards the complaint. A reference number is issued when you forward.
-          A registration message goes to the complainant if a contact is on record, once messaging is set up.
+          A registration message with the reference number goes to the complainant if a contact is on record.
         </p>
         <PillButton primary className="!h-11 !px-6" disabled={busy} onClick={forward}>
           Forward to {vehicle ? `${vehicle.area} ` : ""}area officer
