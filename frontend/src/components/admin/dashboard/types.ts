@@ -34,8 +34,8 @@ export type TimeTarget = {
   closeDays: number;
 };
 
-// The two tiles still on sample data, until the policy library and messaging exist.
-export type SampleDashboardData = Pick<AdminDashboardData, "policy" | "messages">;
+// The one tile still on sample data, until the policy library exists.
+export type SampleDashboardData = Pick<AdminDashboardData, "policy">;
 
 // Everything else comes from the backend.
 export type LiveDashboardData = Omit<AdminDashboardData, keyof SampleDashboardData>;
@@ -66,7 +66,7 @@ export type AdminDashboardData = {
     aiRequests: number;
     aiTimeouts: number;
   };
-  messages: { sent: number; failed: number; byType: Count[] };
+  messages: { sent: number; failed: number; byType: Count[] }; // last 24 hours
   areas: AreaStatus[];
   masterData: {
     people: number;
