@@ -27,6 +27,8 @@ from app.services.complaint_lookup_service import DUPLICATE_WINDOW_DAYS
 
 PAGE_SIZE = 10
 EDITABLE = (ComplaintStatus.DRAFT, ComplaintStatus.INCOMPLETE)
+# Everything Level 1 may still change: its own unfinished entries and the portal complaints it has not checked yet.
+OPEN_AT_LEVEL_ONE = (*EDITABLE, ComplaintStatus.SUBMITTED)
 # Every case that has left Level 1 (forwarded, or since moved on by Level 2 or Level 3).
 LEFT_LEVEL_ONE = (
     ComplaintStatus.FORWARDED,
@@ -157,8 +159,8 @@ def list_complaints(
             severity_name=severity,
             complaint_date=c.complaint_date,
             updated_at=c.updated_at,
-            editable=c.status in EDITABLE,
-            possible_duplicate=dup and c.status in EDITABLE,
+            editable=c.status in OPEN_AT_LEVEL_ONE,
+            possible_duplicate=dup and c.status in OPEN_AT_LEVEL_ONE,
             bus_verification=c.bus_verification,
             synthetic=c.synthetic_batch_id is not None,
         )

@@ -2,9 +2,10 @@ import { SeverityChip } from "@/components/dashboard/severity";
 import { Card, CardHeading, PillLink, muted } from "@/components/dashboard/ui";
 import type { ForwardedCase } from "./types";
 
-// Messaging is not built yet, so a message is only ever due. A failed message will never block a case.
+// Whether the registration message reached the complainant. A message that was not sent never blocks a case.
 const MESSAGE = {
-  due: { text: "Registration message due once messaging is set up", dot: "bg-amber-500" },
+  sent: { text: "Registration message sent", dot: "bg-emerald-500" },
+  not_sent: { text: "Registration message not sent", dot: "bg-amber-500" },
   none: { text: "No contact, no message to send", dot: "bg-slate-400" },
 };
 

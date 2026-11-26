@@ -51,8 +51,8 @@ const ACCUSED_NOTE: Record<string, string> = {
 };
 
 // The Level 1 list of complaints: one table for the Complaints page, for the dashboard cards that open a filtered
-// view of it, and (with a fixed filter and no tabs) for Portal submissions. Drafts and incomplete cases open in the
-// form to be finished; everything else is read-only.
+// view of it, and (with a fixed filter and no tabs) for Portal submissions. Drafts, incomplete cases and
+// unchecked portal complaints open in the form to be finished; everything else is read-only.
 export function ComplaintsList({
   title,
   subtitle,
@@ -66,7 +66,6 @@ export function ComplaintsList({
   onClearFilter,
   fixed = false,
   emptyText,
-  notice,
   initial,
 }: {
   title: string;
@@ -81,7 +80,6 @@ export function ComplaintsList({
   onClearFilter?: () => void;
   fixed?: boolean;
   emptyText: string;
-  notice?: string;
   initial?: ComplaintPage; // the first view, read together with the page, so it needs no request of its own
 }) {
   const [typed, setTyped] = useState("");
@@ -194,7 +192,6 @@ export function ComplaintsList({
         </div>
       )}
 
-      {notice && <Note tone="neutral">{notice}</Note>}
       {answer?.error && <Note tone="alert">{answer.error}</Note>}
 
       {/* relative: a visually hidden label in the last column is absolutely positioned, and without this the

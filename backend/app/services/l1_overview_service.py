@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.enums import VehicleType
+from app.core.enums import MessageType, VehicleType
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL
 from app.models import Area, Complaint, ComplaintMedium, Severity, User, Vehicle
@@ -18,6 +18,7 @@ from app.schemas.l1_overview import (
     SourceRow,
     TransportCounts,
 )
+from app.services import messaging_service
 from app.services.auth_service import Principal
 
 RECENT_LIMIT = 4
@@ -94,6 +95,7 @@ def overview(db: Session, officer: Principal) -> OverviewOut:
         .limit(RECENT_LIMIT)
     ).all()
 
+    sent = messaging_service.sent_to(db, [c.id for c, _, _ in latest], MessageType.REGISTERED)
     return OverviewOut(
         month_total=sum(s.count for s in sources),
         sources=sources,
@@ -113,6 +115,7 @@ def overview(db: Session, officer: Principal) -> OverviewOut:
                 area_name=area,
                 forwarded_at=c.forwarded_at,
                 has_contact=bool(c.contact_phone or c.contact_email),
+                message_sent=c.id in sent,
             )
             for c, area, rank in latest
         ],

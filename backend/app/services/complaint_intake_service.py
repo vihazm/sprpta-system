@@ -1,11 +1,13 @@
 """The Level 1 complaint form (UC-L1-01 to UC-L1-10): save, finish later, forward or reject.
 
 Statuses follow the System Flow Document section 3.3. L1 may only move a
-complaint out of Draft or Incomplete, and every move is written to the audit
-trail. The reference number is issued when the complaint is first saved as
-Incomplete or forwarded; that moment also starts the time-target clock, and
-Incomplete pauses it. The registration message to the complainant belongs to
-the messaging module, which is not built yet.
+complaint out of Draft, Incomplete or Submitted (a portal complaint it has not
+checked yet), and every move is written to the audit trail. A portal complaint
+goes through the same form; only who sent it and how stay as the complainant's
+account gave them. The reference number is issued when the complaint is first
+saved as Incomplete or forwarded; that moment also starts the time-target clock,
+and Incomplete pauses it. The registration message (MSG-1) goes to the complainant
+then, if a phone or email is on record.
 """
 
 from datetime import datetime
@@ -14,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.enums import ComplaintStatus, DuplicateLinkType, PersonType, RejectionType
+from app.core.enums import ComplaintStatus, DuplicateLinkType, MessageType, PersonType, RejectionType
 from app.core.identifiers import normalise_identifier
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL
@@ -42,12 +44,10 @@ from app.schemas.l1_complaints import (
     DutySnapshotOut,
     RejectBody,
 )
-from app.services import audit_service
+from app.services import audit_service, messaging_service
 from app.services import complaint_lookup_service as lookup
-from app.services.complaint_list_service import accused_status
+from app.services.complaint_list_service import OPEN_AT_LEVEL_ONE, accused_status
 from app.services.auth_service import Principal
-
-EDITABLE = (ComplaintStatus.DRAFT, ComplaintStatus.INCOMPLETE)
 
 
 class ComplaintError(Exception):
@@ -102,6 +102,8 @@ def _out(db: Session, complaint: Complaint) -> ComplaintOut:
         id=complaint.id,
         reference_number=complaint.reference_number,
         status=complaint.status,
+        via_portal=complaint.submitted_via_portal,
+        registration_message_sent=complaint.id in messaging_service.sent_to(db, [complaint.id], MessageType.REGISTERED),
         medium_id=complaint.medium_id,
         is_anonymous=complaint.is_anonymous,
         complainant_name=complaint.complainant_name,
@@ -157,9 +159,11 @@ def find_complaint(db: Session, complaint_id: int, *, lock: bool = False) -> Com
 def find_editable(db: Session, complaint_id: int) -> Complaint:
     """The complaint, locked for this request, if L1 may still change it."""
     complaint = find_complaint(db, complaint_id, lock=True)
-    if complaint.status not in EDITABLE:
+    if complaint.withdrawn_at is not None:
+        raise ComplaintError(409, "withdrawn", "The complainant deleted this complaint, so there is nothing left to check.")
+    if complaint.status not in OPEN_AT_LEVEL_ONE:
         raise ComplaintError(
-            409, "not_editable", "Only a draft or an incomplete complaint can be changed. This one is already past that."
+            409, "not_editable", "Only a draft, an incomplete or an unchecked portal complaint can be changed. This one is already past that."
         )
     return complaint
 
@@ -272,7 +276,9 @@ def _check_target(db: Session, data: ComplaintForm) -> ComplaintTargetType | Non
 
 
 def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: ComplaintForm) -> None:
-    must_exist(db, ComplaintMedium, data.medium_id, "medium", ComplaintMedium.is_system.is_(False))
+    portal = complaint.submitted_via_portal
+    if not portal:
+        must_exist(db, ComplaintMedium, data.medium_id, "medium", ComplaintMedium.is_system.is_(False))
     must_exist(db, ComplaintCategory, data.category_id, "category")
     must_exist(db, Severity, data.severity_id, "severity")
     must_exist(db, RouteStand, data.route_stand_id, "route_stand")
@@ -281,15 +287,17 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
     if data.complaint_date and data.complaint_date > datetime.now(LOCAL).date():
         raise ComplaintError(422, "future_date", "The date cannot be in the future.")
 
-    complaint.is_anonymous = data.is_anonymous
-    if data.is_anonymous:
-        complaint.complainant_name = complaint.contact_phone = complaint.contact_email = None
-    else:
-        complaint.complainant_name = _clean(data.complainant_name)
-        complaint.contact_phone = _mobile(data.mobile)
-        complaint.contact_email = _email(data.email)
+    # A portal complaint keeps the Portal medium and the contact details of the account that sent it.
+    if not portal:
+        complaint.is_anonymous = data.is_anonymous
+        if data.is_anonymous:
+            complaint.complainant_name = complaint.contact_phone = complaint.contact_email = None
+        else:
+            complaint.complainant_name = _clean(data.complainant_name)
+            complaint.contact_phone = _mobile(data.mobile)
+            complaint.contact_email = _email(data.email)
+        complaint.medium_id = data.medium_id
 
-    complaint.medium_id = data.medium_id
     complaint.incident_time = data.incident_time
     complaint.incident_location = _clean(data.incident_location)
     complaint.subject_person_id = data.subject_person_id
@@ -351,7 +359,8 @@ def _apply_form(db: Session, principal: Principal, complaint: Complaint, data: C
 
     complaint.vehicle_number_entered = number
     complaint.vehicle_id = vehicle.id if vehicle else None
-    complaint.area_id = vehicle.registered_area_id if vehicle else None
+    if vehicle or not portal:  # until the bus is found, a portal complaint keeps the area the complainant chose
+        complaint.area_id = vehicle.registered_area_id if vehicle else None
 
 
 def _already_created(db: Session, principal: Principal, request_id: str | None) -> Complaint | None:
@@ -414,15 +423,16 @@ def _move(db: Session, principal: Principal, complaint: Complaint, to: Complaint
 
 
 def save_incomplete(db: Session, principal: Principal, complaint_id: int) -> ComplaintOut:
-    """Draft to Incomplete: issues the reference number and pauses the clock."""
+    """Draft or Submitted to Incomplete: issues the reference number and pauses the clock."""
     complaint = find_editable(db, complaint_id)
-    if complaint.status != ComplaintStatus.DRAFT:
+    if complaint.status == ComplaintStatus.INCOMPLETE:
         raise ComplaintError(409, "already_incomplete", "This complaint is already incomplete.")
     now = datetime.now(LOCAL)
     _issue_reference(complaint, now)
     complaint.paused_since = now
     _move(db, principal, complaint, ComplaintStatus.INCOMPLETE, "complaint.incomplete")
     db.commit()
+    messaging_service.send_case_message(db, complaint, MessageType.REGISTERED)
     return _out(db, complaint)
 
 
@@ -478,6 +488,7 @@ def forward(db: Session, principal: Principal, complaint_id: int) -> ComplaintOu
         details={"assigned_l2_user_id": officer.id},
     )
     db.commit()
+    messaging_service.send_case_message(db, complaint, MessageType.REGISTERED)  # unless it went out at Incomplete
     return _out(db, complaint)
 
 

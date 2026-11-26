@@ -80,7 +80,7 @@ export type ComplaintFields = {
   description: string;
 };
 
-export type ComplaintStatus = "draft" | "incomplete" | "forwarded" | "rejected" | "other";
+export type ComplaintStatus = "submitted" | "draft" | "incomplete" | "forwarded" | "rejected" | "other";
 
 // How far the accused person is established, worked out by the server and never taken from the form.
 export type AccusedStatus = "verified_duty" | "registered_owner" | "directory_only" | "unidentified" | "none";
@@ -91,6 +91,8 @@ export type SavedComplaint = {
   id: number;
   reference: string | null; // a draft has none yet
   status: ComplaintStatus;
+  viaPortal: boolean; // sent by a complainant through the portal
+  messageSent: boolean; // the registration message went out to the complainant
   values: ComplaintFields;
   vehicle: VehicleRecord | null;
   duty: BusRecord | null; // the verified record as it was when the complaint was saved

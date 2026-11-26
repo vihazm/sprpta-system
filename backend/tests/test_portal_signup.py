@@ -24,7 +24,7 @@ def sign_up(client, identifier=EMAIL, name="Nimali Perera", password=PASSWORD):
 
 def printed_code(capsys) -> str:
     """The code the backend printed in its terminal (console mode)."""
-    found = re.findall(r"\[SPRPTA sign-up code\] \S+: (\d{6})", capsys.readouterr().out)
+    found = re.findall(r"\[SPRPTA sign-up code\].*\n.*?(\d{6})", capsys.readouterr().out)
     assert found, "no code was printed"
     return found[-1]
 
