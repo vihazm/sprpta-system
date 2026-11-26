@@ -5,7 +5,7 @@ from itertools import count
 import pytest
 from fastapi.testclient import TestClient
 
-from app.core.enums import ComplaintStatus, VehicleType
+from app.core.enums import ComplaintStatus, MessageChannel, MessageState, MessageType, VehicleType
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL
 from app.main import app
@@ -14,6 +14,7 @@ from app.models import (
     Complaint,
     ComplaintCategory,
     ComplaintMedium,
+    OutboundMessage,
     Permit,
     Severity,
     SystemSetting,
@@ -273,3 +274,29 @@ def test_urgent_items_come_before_low_space_and_locked_staff(client, db, monkeyp
     assert titles(client) == ["The last backup failed", "File storage is almost full", "1 staff account is locked"]
     storage = client.get(URL).json()["file_storage"]
     assert (storage["low"], storage["free_bytes"], storage["total_bytes"]) == (True, 50, 1000)
+
+
+def test_messages_are_counted_from_the_log_for_the_last_24_hours(client, db):
+    signed_in_admin(db, client)
+    assert client.get(URL).json()["messages"] == {
+        "sent": 0,
+        "failed": 0,
+        "by_type": [
+            {"label": label, "count": 0}
+            for label in ("MSG-1 Registered", "MSG-2 Decided", "MSG-3 Closed", "Verification code")
+        ],
+    }
+
+    account = make_complainant(db, "client@sprpta.test")
+    now = datetime.now(UTC)
+    for state, when in (("sent", now), ("sent", now), ("failed", now), ("sent", now - timedelta(hours=30))):
+        db.add(
+            OutboundMessage(
+                complainant_account_id=account.id, message_type=MessageType.OTP, channel=MessageChannel.EMAIL,
+                recipient=account.email, body="code ******", state=MessageState(state), attempted_at=when,
+            )
+        )
+    db.commit()
+    messages = client.get(URL).json()["messages"]
+    assert messages["sent"] == 2 and messages["failed"] == 1  # the one from yesterday is left out
+    assert messages["by_type"][-1] == {"label": "Verification code", "count": 3}

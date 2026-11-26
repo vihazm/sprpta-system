@@ -60,6 +60,7 @@ export async function getLiveData(): Promise<LiveDashboardData | null> {
       categories: body.master_data.categories,
       vehiclesWithoutPermit: body.master_data.vehicles_without_permit,
     },
+    messages: { sent: body.messages.sent, failed: body.messages.failed, byType: body.messages.by_type },
     complaints: {
       perDay: body.complaints.per_day,
       byArea: body.complaints.by_area,
