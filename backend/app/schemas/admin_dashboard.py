@@ -1,7 +1,7 @@
 """Response shapes of the administrator dashboard (UI-AD-01).
 
 Only the figures the system can answer today are here; the frontend keeps sample
-data for the policy library and message delivery until those modules exist.
+data for the policy library until that module exists.
 """
 
 from typing import Literal
@@ -69,6 +69,14 @@ class ComplaintVolume(BaseModel):
     overdue: int  # open cases past a time target now, of any age
 
 
+class Messages(BaseModel):
+    """Messages to complainants in the last 24 hours, counted from the message log."""
+
+    sent: int
+    failed: int
+    by_type: list[Count]  # every kind of message, in the order of the templates screen
+
+
 class TimeTarget(BaseModel):
     severity: str
     forward_days: int
@@ -91,5 +99,6 @@ class AdminDashboard(BaseModel):
     attention: list[AttentionItem]  # most urgent first
     areas: list[AreaStatus]
     master_data: MasterData
+    messages: Messages
     complaints: ComplaintVolume
     time_targets: list[TimeTarget]

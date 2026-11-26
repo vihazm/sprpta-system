@@ -16,8 +16,8 @@ import { Card, Chip, muted } from "@/components/dashboard/ui";
 
 // The content of the administrator dashboard (UI-AD-01). One column on narrow
 // screens, a 12-column bento grid from 1200px up.
-// Every tile is live except the policy library and message delivery, which show
-// sample data until the AI and messaging modules exist.
+// Every tile is live except the policy library, which shows sample data until the
+// AI module exists.
 export async function AdminDashboard() {
   const live = await getLiveData();
 
@@ -36,7 +36,7 @@ export async function AdminDashboard() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[1.25rem] font-extrabold tracking-[-0.02em]">Today at a glance</h2>
-        <Chip>Policy and messages: sample data</Chip>
+        <Chip>Policy library: sample data</Chip>
       </div>
 
       <div className="grid grid-cols-1 gap-4 min-[1200px]:grid-cols-12">

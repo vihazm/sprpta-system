@@ -11,9 +11,21 @@ from datetime import UTC, datetime, time, timedelta
 from sqlalchemy import distinct, exists, func, select
 from sqlalchemy.orm import Session
 
+from app.core.enums import MessageState
 from app.core.roles import UserRole
 from app.core.timezone import LOCAL, LOCAL_TIMEZONE
-from app.models import Area, AuthSession, ComplainantAccount, Complaint, Permit, Severity, UsageLog, User, Vehicle
+from app.models import (
+    Area,
+    AuthSession,
+    ComplainantAccount,
+    Complaint,
+    OutboundMessage,
+    Permit,
+    Severity,
+    UsageLog,
+    User,
+    Vehicle,
+)
 from app.schemas.admin_dashboard import (
     AdminDashboard,
     AreaStatus,
@@ -21,6 +33,7 @@ from app.schemas.admin_dashboard import (
     ComplaintVolume,
     Count,
     MasterData,
+    Messages,
     PortalUsers,
     Sessions,
     TimeTarget,
@@ -28,6 +41,7 @@ from app.schemas.admin_dashboard import (
 )
 from app.schemas.system_health import Backup, FileStorage, ServiceStatus
 from app.services import master_data_service, system_health_service
+from app.services.messaging_service import KINDS
 from app.services.l2_case_service import overdue
 
 HOURS_SHOWN = 24
@@ -200,6 +214,25 @@ def complaint_volume(db: Session, now: datetime) -> ComplaintVolume:
     )
 
 
+def message_delivery(db: Session, now: datetime) -> Messages:
+    """How many messages went out in the last 24 hours, how many failed, and of which kind."""
+    rows = db.execute(
+        select(OutboundMessage.message_type, OutboundMessage.state, func.count())
+        .where(OutboundMessage.attempted_at >= now - timedelta(hours=HOURS_SHOWN))
+        .group_by(OutboundMessage.message_type, OutboundMessage.state)
+    ).all()
+    per_type = {kind: 0 for kind in KINDS}
+    failed = 0
+    for kind, state, count in rows:
+        per_type[kind] += count
+        failed += count if state == MessageState.FAILED else 0
+    return Messages(
+        sent=sum(per_type.values()) - failed,
+        failed=failed,
+        by_type=[Count(label=KINDS[kind].label, count=count) for kind, count in per_type.items()],
+    )
+
+
 def time_targets(db: Session) -> list[TimeTarget]:
     severities = db.scalars(select(Severity).where(Severity.is_active).order_by(Severity.rank))
     return [
@@ -283,6 +316,7 @@ def build_dashboard(db: Session) -> AdminDashboard:
         ),
         areas=areas,
         master_data=master_data_counts(db),
+        messages=message_delivery(db, now),
         complaints=complaint_volume(db, now),
         time_targets=time_targets(db),
     )
