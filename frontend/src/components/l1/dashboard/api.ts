@@ -82,6 +82,7 @@ export async function loadOverview(): Promise<ApiResult<DashboardOverview>> {
       area_name: string | null;
       forwarded_at: string;
       has_contact: boolean;
+      message_sent: boolean;
     }[];
   }>("/api/l1/dashboard/overview");
   return mapData(result, (b) => ({
@@ -99,7 +100,7 @@ export async function loadOverview(): Promise<ApiResult<DashboardOverview>> {
       title: f.title ?? "No subject",
       area: f.area_name,
       when: since(f.forwarded_at),
-      message: f.has_contact ? ("due" as const) : ("none" as const),
+      message: f.message_sent ? ("sent" as const) : f.has_contact ? ("not_sent" as const) : ("none" as const),
     })),
   }));
 }

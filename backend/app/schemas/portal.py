@@ -33,6 +33,10 @@ class VerifyRequest(BaseModel):
     code: str = Field(pattern=r"^\d{6}$")
 
 
+class ResetRequest(VerifyRequest):
+    password: str = Field(min_length=8, max_length=128)
+
+
 # ---------------------------------------------------------------- the complainant's complaints
 
 

@@ -17,7 +17,7 @@ from uuid import uuid4
 from sqlalchemy import DateTime, and_, case, false, func, or_, select, type_coerce
 from sqlalchemy.orm import Session
 
-from app.core.enums import ComplaintStatus, DecisionAction, DecisionOutcome
+from app.core.enums import ComplaintStatus, DecisionAction, DecisionOutcome, MessageType
 from app.core.timezone import LOCAL
 from app.models import (
     Area,
@@ -61,7 +61,7 @@ from app.schemas.l2_cases import (
     SolutionDocumentOut,
     TimeTarget,
 )
-from app.services import audit_service, l2_recommendation_service, solution_pdf
+from app.services import audit_service, l2_recommendation_service, messaging_service, solution_pdf
 from app.services.auth_service import Principal
 from app.services.complaint_attachment_service import storage_root
 from app.services.complaint_intake_service import ComplaintError
@@ -586,6 +586,7 @@ def create_solution_document(
         db.rollback()
         file.unlink(missing_ok=True)  # no row points at the file, so do not leave it behind
         raise
+    messaging_service.send_case_message(db, c, MessageType.DECIDED, solution_text=document.solution_details)
     return _detail(db, c)
 
 
