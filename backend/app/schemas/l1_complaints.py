@@ -164,6 +164,7 @@ class ComplaintOut(BaseModel):
     id: int
     reference_number: str | None  # none while a draft
     status: ComplaintStatus
+    via_portal: bool  # sent by a complainant through the portal
     medium_id: int | None
     is_anonymous: bool
     complainant_name: str | None

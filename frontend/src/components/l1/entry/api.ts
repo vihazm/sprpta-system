@@ -84,6 +84,7 @@ type ApiComplaint = {
   id: number;
   reference_number: string | null;
   status: string;
+  via_portal: boolean;
   medium_id: number | null;
   is_anonymous: boolean;
   complainant_name: string | null;
@@ -136,13 +137,14 @@ function toAttachment(a: ApiAttachment): Attachment {
   return { id: a.id, name: a.file_name, size: a.size_bytes };
 }
 
-const KNOWN_STATUS = ["draft", "incomplete", "forwarded", "rejected"];
+const KNOWN_STATUS = ["submitted", "draft", "incomplete", "forwarded", "rejected"];
 
 function toComplaint(c: ApiComplaint): SavedComplaint {
   return {
     id: c.id,
     reference: c.reference_number,
     status: (KNOWN_STATUS.includes(c.status) ? c.status : "other") as ComplaintStatus,
+    viaPortal: c.via_portal,
     values: {
       anonymous: c.is_anonymous,
       name: c.complainant_name ?? "",

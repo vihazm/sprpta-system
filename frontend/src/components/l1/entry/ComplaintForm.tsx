@@ -6,7 +6,7 @@ import { Field, inputClass, textareaClass } from "@/components/dashboard/control
 import { Icon } from "@/components/dashboard/icons";
 import { Note } from "@/components/dashboard/Note";
 import { SEVERITY_COLOR, type Severity } from "@/components/dashboard/severity";
-import { Chip, PillButton, muted } from "@/components/dashboard/ui";
+import { Chip, PillButton, PillLink, muted } from "@/components/dashboard/ui";
 import { FieldError } from "@/components/login/FieldError";
 import { loadTrip, toBusRecord } from "@/components/l1/lookup/api";
 import { BusLookupPanel } from "@/components/l1/lookup/BusLookupPanel";
@@ -212,6 +212,14 @@ export function ComplaintForm({
 
       if (existing?.ok) {
         show(existing.data);
+        const { vehicle: known, values: sent } = existing.data;
+        if (!known && sent.vehicleNumber) {
+          // A portal complaint arrives with only the number the complainant typed: look it up straight away.
+          const bus = await lookupVehicle(sent.vehicleNumber);
+          if (!current) return;
+          setVehicle(bus.ok ? bus.data : null);
+          setVehicleMissing(!bus.ok && bus.status === 404);
+        }
         const found = await loadDuplicates(existing.data.id);
         if (current && found.ok) setCandidates(found.data);
       } else {
@@ -457,7 +465,7 @@ export function ComplaintForm({
   if (loadError) return <Note tone="alert">{loadError}</Note>;
   if (!options) return <p className={muted}>Loading the form…</p>;
 
-  if (saved && saved.status !== "draft" && saved.status !== "incomplete" && !finished) {
+  if (saved && !["submitted", "draft", "incomplete"].includes(saved.status) && !finished) {
     return (
       <div className="flex flex-col gap-4">
         <Note tone="neutral">
@@ -501,9 +509,15 @@ export function ComplaintForm({
             </>
           )}
         </p>
-        <PillButton className="self-start" onClick={startAnother}>
-          Enter another complaint
-        </PillButton>
+        {finished.viaPortal ? (
+          <PillLink className="self-start" href="/l1/portal-submissions">
+            Back to portal submissions
+          </PillLink>
+        ) : (
+          <PillButton className="self-start" onClick={startAnother}>
+            Enter another complaint
+          </PillButton>
+        )}
       </div>
     );
   }
@@ -535,7 +549,14 @@ export function ComplaintForm({
   const markedDuplicate = candidates.find((c) => c.choice === "duplicate_of")?.reference ?? "";
   const medium = options.mediums.find((m) => m.id === values.mediumId)?.name ?? "";
   const severity = options.severities.find((s) => s.id === values.severityId)?.name ?? "";
-  const status = saved ? (saved.reference ? `Incomplete, ${saved.reference}` : "Draft saved") : "Not saved yet";
+  const portal = saved?.viaPortal ?? false;
+  const status = !saved
+    ? "Not saved yet"
+    : saved.reference
+      ? `Incomplete, ${saved.reference}`
+      : portal
+        ? "Portal submission, not checked yet"
+        : "Draft saved";
 
   const quick = layout === "quick";
   const titles = quick
@@ -635,7 +656,13 @@ export function ComplaintForm({
                 id="c-area"
                 readOnly
                 className={vehicle ? filledIn : inputClass}
-                value={vehicle ? `${vehicle.area} (from the vehicle)` : ""}
+                value={
+                  vehicle
+                    ? `${vehicle.area} (from the vehicle)`
+                    : portal && saved?.area
+                      ? `${saved.area} (chosen by the complainant)`
+                      : ""
+                }
                 placeholder="Filled in from the vehicle"
               />
             </Field>
@@ -694,7 +721,38 @@ export function ComplaintForm({
   );
 
   // ------------------------------------------------ who complained
-  const complainantSection = (
+  const complainantType = (
+    <Field label="Complainant type">
+      <ChoiceGroup
+        label="Complainant type"
+        choices={COMPLAINANT_TYPES.map((c) => ({ value: c.label }))}
+        defaultValue={COMPLAINANT_TYPES.find((c) => c.type === values.complainantType)?.label ?? ""}
+        onChange={([label]) => set("complainantType", COMPLAINANT_TYPES.find((c) => c.label === label)?.type ?? null)}
+      />
+    </Field>
+  );
+
+  // A portal complaint's sender is the account that sent it, so the name, contact and medium are shown, not edited.
+  const complainantSection = portal ? (
+    <>
+      <Step>{titles.complainant}</Step>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-[1.1rem] bg-[#faf6f7] px-4 py-3 text-[0.81rem]">
+        <span>
+          Complainant <b>{values.name || "–"}</b>
+        </span>
+        <span>
+          Mobile <b>{values.mobile || "–"}</b>
+        </span>
+        <span>
+          Email <b>{values.email || "–"}</b>
+        </span>
+        <span>
+          Medium <b>Portal</b>
+        </span>
+      </div>
+      {complainantType}
+    </>
+  ) : (
     <>
       <Step>{titles.complainant}</Step>
       <div className="grid gap-3.5 sm:grid-cols-3">
@@ -756,14 +814,7 @@ export function ComplaintForm({
           )}
         </Field>
       </div>
-      <Field label="Complainant type">
-        <ChoiceGroup
-          label="Complainant type"
-          choices={COMPLAINANT_TYPES.map((c) => ({ value: c.label }))}
-          defaultValue={COMPLAINANT_TYPES.find((c) => c.type === values.complainantType)?.label ?? ""}
-          onChange={([label]) => set("complainantType", COMPLAINANT_TYPES.find((c) => c.label === label)?.type ?? null)}
-        />
-      </Field>
+      {complainantType}
       <Field label="Complaint medium *">
         <ChoiceGroup
           label="Medium"
@@ -915,7 +966,7 @@ export function ComplaintForm({
       </p>
       <div className="flex flex-wrap items-center gap-2.5">
         <PillButton disabled={busy} onClick={saveDraft}>
-          {saved?.reference ? "Save changes" : "Save draft"}
+          {saved?.reference || portal ? "Save changes" : "Save draft"}
         </PillButton>
         <PillButton className="!border-amber-200 !text-amber-900" disabled={busy} onClick={markIncomplete}>
           Save as incomplete
@@ -944,6 +995,12 @@ export function ComplaintForm({
 
   return (
     <div key={formKey} className="flex flex-col gap-4">
+      {portal && saved?.status === "submitted" && (
+        <Note tone="neutral">
+          Sent by the complainant through the portal. Check the bus and the details, set the severity, then forward it,
+          save it as incomplete or reject it.
+        </Note>
+      )}
       <p className={muted}>
         <span className="font-bold text-crimson">*</span> needed before the complaint can be forwarded. A draft or an
         incomplete complaint can be saved without them.
