@@ -5,8 +5,12 @@ digit code goes to that email or phone; once it is entered the account is
 verified and signed in. Until then the account cannot log in.
 
 Password reset: a verified account asks for a code, then sends it back with a
-new password. Every session of the account is ended. Staff passwords are not
-reset here; the System Administrator handles staff accounts.
+new password. Every session of the account is ended.
+
+Staff accounts are managed by the System Administrator, so a staff email or
+phone number is told so (check_not_staff) instead of getting a code or a new
+account. This does show which addresses belong to staff; every request here is
+counted per IP address, so they cannot be guessed in bulk.
 
 Codes are stored only as a keyed hash, expire after a few minutes, allow a few
 wrong guesses and can be asked for again after a short wait. The code goes out
@@ -44,6 +48,12 @@ class SignupError(Exception):
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+STAFF_ACCOUNT = (
+    "This email or number belongs to a staff account. Staff accounts and passwords are managed by the "
+    "System Administrator, so please contact them."
+)
 
 
 def _invalid_code() -> SignupError:
@@ -141,14 +151,28 @@ def _pending_account(db: Session, kind: str, value: str) -> ComplainantAccount |
     return account
 
 
+def _staff_login(db: Session, value: str) -> bool:
+    return db.scalar(select(User.id).where(User.login == value)) is not None
+
+
+def check_not_staff(db: Session, identifier: str) -> None:
+    """Refuse a staff email or phone number: staff cannot sign up or reset their password here.
+
+    Anything that is not a valid email or mobile number is left for the next page to point out.
+    """
+    parsed = normalise_identifier(identifier)
+    if parsed is not None and _staff_login(db, parsed[1]):
+        raise SignupError(409, "staff_account", STAFF_ACCOUNT)
+
+
 def sign_up(db: Session, name: str, identifier: str, password: str) -> tuple[str, int]:
     """Create the account (not yet usable) and send its code. Returns (channel, resend wait in seconds)."""
+    check_not_staff(db, identifier)
     kind, value = _parse(identifier)
     column = ComplainantAccount.email if kind == "email" else ComplainantAccount.phone
-    taken_by_staff = db.scalar(select(User.id).where(User.login == value))
     existing = db.scalar(select(ComplainantAccount).where(column == value).with_for_update())
 
-    if taken_by_staff is not None or (existing is not None and (existing.verified_at or not existing.is_active)):
+    if existing is not None and (existing.verified_at or not existing.is_active):
         label = "email address" if kind == "email" else "mobile number"
         raise SignupError(409, "already_registered", f"That {label} is already registered. Try signing in instead.")
 
@@ -201,9 +225,10 @@ def _verified_account(db: Session, kind: str, value: str) -> ComplainantAccount 
 def request_reset(db: Session, identifier: str) -> tuple[str, int]:
     """Send a reset code. Returns (channel, resend wait in seconds).
 
-    The answer is the same whether or not the account exists, so nobody can use this to find out who is registered.
-    Asking again too soon sends nothing and only returns the time left.
+    The answer is the same whether or not a complainant account exists, so nobody can use this to find out who is
+    registered. A staff address is refused. Asking again too soon sends nothing and only returns the time left.
     """
+    check_not_staff(db, identifier)
     kind, value = _parse(identifier)
     channel = "email" if kind == "email" else "sms"
     account = _verified_account(db, kind, value)
