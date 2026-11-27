@@ -24,6 +24,9 @@ _test_url = _base.set(database="sprpta_test")
 os.environ["DATABASE_URL"] = _test_url.render_as_string(hide_password=False)
 os.environ.setdefault("JWT_SECRET", "test-secret-" + "x" * 40)
 os.environ["APP_ENV"] = "development"
+# Never send real email from the tests, even when backend/.env has SMTP set up: codes and messages are printed, and
+# the tests that need a mail server use a fake one (the `mailbox` fixture).
+os.environ["SMTP_HOST"] = ""
 
 from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402

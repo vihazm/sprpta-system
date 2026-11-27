@@ -85,3 +85,14 @@ def reset_password(body: ResetRequest, request: Request, db: Session = Depends(g
     except SignupError as exc:
         raise _fail(exc) from None
     return Response(status_code=204, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/account-check", status_code=204)
+def account_check(body: ResendRequest, request: Request, db: Session = Depends(get_db)) -> Response:
+    """Before the sign-in page opens Create account or Forgot password: refuses a staff email or phone number."""
+    _limit(request)
+    try:
+        signup.check_not_staff(db, body.identifier)
+    except SignupError as exc:
+        raise _fail(exc) from None
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})

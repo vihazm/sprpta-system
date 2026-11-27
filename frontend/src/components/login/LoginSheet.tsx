@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type MouseEvent } from "react";
 import { signIn } from "@/lib/auth-client";
 import { notify } from "@/lib/notify";
+import { checkNotStaff } from "@/lib/signup-client";
 import { safeNextPath } from "@/lib/roles";
 import {
   normaliseIdentifier,
@@ -23,6 +24,7 @@ const inputClass =
 export function LoginSheet() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [opening, setOpening] = useState(false); // checking the typed address before Create account or Forgot password
   const [mode, setMode] = useState<AuthMode>("email");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -40,6 +42,21 @@ export function LoginSheet() {
     setMode(next);
     setIdentifier("");
     setIdentifierTouched(false);
+  }
+
+  // Create account and Forgot password are for complainants. When an email or phone number is already typed in, a
+  // staff one is caught here and told to contact the administrator; anything else opens the page as usual.
+  async function openForComplainants(e: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (validateIdentifier(mode, identifier)) return; // nothing usable typed: just follow the link
+    e.preventDefault();
+    if (opening) return;
+    setOpening(true);
+    const result = await checkNotStaff(normaliseIdentifier(mode, identifier));
+    if (!result.ok && result.code === "staff_account") {
+      setOpening(false);
+      return notify.error(result.title, result.message);
+    }
+    router.push(href); // any other answer opens the page, which checks again itself
   }
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -117,6 +134,7 @@ export function LoginSheet() {
             </label>
             <Link
               href="/forgot-password"
+              onClick={(e) => openForComplainants(e, "/forgot-password")}
               className="focus-ring rounded-sm text-[0.8rem] font-bold text-crimson hover:underline"
             >
               Forgot password?
@@ -160,6 +178,7 @@ export function LoginSheet() {
 
       <Link
         href="/signup"
+        onClick={(e) => openForComplainants(e, "/signup")}
         className="focus-ring mt-[1.1rem] flex h-12 items-center justify-center gap-[0.4rem] rounded-2xl border-[1.5px] border-[#E5E7EB] text-[0.86rem] font-medium text-muted transition-colors hover:border-crimson"
       >
         New complainant?

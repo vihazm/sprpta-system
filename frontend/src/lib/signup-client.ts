@@ -16,6 +16,7 @@ const TITLES: Record<string, string> = {
   too_many_attempts: "Too many attempts",
   code_not_sent: "Code not sent",
   no_pending_signup: "Sign-up not found",
+  staff_account: "Staff account",
 };
 
 async function post(path: string, body: unknown): Promise<{ res: Response; data: unknown } | Failure> {
@@ -94,6 +95,13 @@ export function requestReset(identifier: string) {
 
 export async function resetPassword(identifier: string, code: string, password: string): Promise<{ ok: true } | Failure> {
   const result = await post("/api/auth/reset-password", { identifier, code, password });
+  if ("ok" in result) return result;
+  return result.res.ok ? { ok: true } : failure(result.res, result.data);
+}
+
+/** Refuses a staff email or phone number before the sign-in page opens Create account or Forgot password. */
+export async function checkNotStaff(identifier: string): Promise<{ ok: true } | Failure> {
+  const result = await post("/api/auth/account-check", { identifier });
   if ("ok" in result) return result;
   return result.res.ok ? { ok: true } : failure(result.res, result.data);
 }

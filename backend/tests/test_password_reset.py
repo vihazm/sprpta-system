@@ -56,8 +56,7 @@ def test_an_expired_code_is_refused(client, db, capsys):
 
 
 def test_an_unknown_address_gets_the_same_answer_and_no_code(client, db, capsys):
-    make_user(db, "office@sprpta.test", UserRole.L1)  # staff are reset by the administrator, not here
-    for identifier in ("nobody@sprpta.test", "office@sprpta.test"):
+    for identifier in ("nobody@sprpta.test",):
         answer = client.post(FORGOT, json={"identifier": identifier})
         assert answer.status_code == 200 and answer.json()["channel"] == "email"
     assert "password reset code" not in capsys.readouterr().out
@@ -97,3 +96,31 @@ def test_a_short_password_is_refused(client, db, capsys):
     client.post(FORGOT, json={"identifier": EMAIL})
     assert reset(client, printed_code(capsys), password="short").status_code == 422
     assert sign_in(client, EMAIL, PASSWORD).status_code == 200
+
+
+def test_staff_are_told_to_contact_the_administrator(client, db, capsys):
+    make_user(db, "office@sprpta.test", UserRole.L1)
+    for path, body in (
+        ("/api/auth/account-check", {"identifier": "Office@sprpta.test"}),
+        (FORGOT, {"identifier": "office@sprpta.test"}),
+        ("/api/auth/signup", {"name": "Office", "identifier": "office@sprpta.test", "password": "long-enough-1"}),
+    ):
+        refused = client.post(path, json=body)
+        assert refused.status_code == 409 and refused.json()["detail"]["code"] == "staff_account", path
+        assert "System Administrator" in refused.json()["detail"]["message"]
+    assert "code" not in capsys.readouterr().out
+    assert db.scalar(select(OtpCode)) is None
+
+
+def test_anyone_else_passes_the_account_check(client, db):
+    make_complainant(db, EMAIL)
+    for identifier in (EMAIL, "nobody@sprpta.test", "not an address"):
+        assert client.post("/api/auth/account-check", json={"identifier": identifier}).status_code == 204
+
+
+def test_the_account_check_is_limited_per_address(client, db, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ip_failure_limit", 3)
+    answers = [client.post("/api/auth/account-check", json={"identifier": f"n{i}@sprpta.test"}).status_code for i in range(4)]
+    assert answers == [204, 204, 204, 429]
