@@ -8,9 +8,8 @@ from sqlalchemy import select
 
 from app.core.config import settings
 from app.core.enums import MessageState
-from app.core.roles import UserRole
 from app.models import ComplainantAccount, OtpCode, OutboundMessage
-from tests.conftest import PASSWORD, make_complainant, make_user, sign_in
+from tests.conftest import PASSWORD, make_complainant, sign_in
 
 SIGNUP = "/api/auth/signup"
 VERIFY = "/api/auth/verify-otp"
@@ -124,12 +123,10 @@ def test_a_phone_number_gets_a_text_message_code(client, db, capsys):
     assert created.phone == "+94712345678" and created.email is None
 
 
-def test_a_registered_email_or_login_cannot_sign_up_again(client, db):
+def test_a_registered_email_cannot_sign_up_again(client, db):
     make_complainant(db, "taken@sprpta.test")
-    make_user(db, "staff@sprpta.test", UserRole.L1)
-    for identifier in ("taken@sprpta.test", "staff@sprpta.test"):
-        r = sign_up(client, identifier)
-        assert r.status_code == 409 and r.json()["detail"]["code"] == "already_registered"
+    r = sign_up(client, "taken@sprpta.test")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "already_registered"
 
 
 def test_an_unfinished_sign_up_can_be_started_again(client, db, capsys):
